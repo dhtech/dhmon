@@ -1,0 +1,195 @@
+diff -uar rtg-0.7.4.origin/src/common.h rtg-0.7.4/src/common.h
+--- rtg-0.7.4.origin/src/common.h	2003-09-18 21:00:02.000000000 +0200
++++ rtg-0.7.4/src/common.h	2014-02-28 22:48:48.911781853 +0100
+@@ -50,4 +50,5 @@
+ # include <mysql.h>
+ #endif
+ 
++# include <zmq.h>
+ #endif /* RTG_COMMON_H */
+diff -uar rtg-0.7.4.origin/src/rtg.h rtg-0.7.4/src/rtg.h
+--- rtg-0.7.4.origin/src/rtg.h	2003-09-25 17:56:04.000000000 +0200
++++ rtg-0.7.4/src/rtg.h	2014-02-28 22:53:03.076097137 +0100
+@@ -40,6 +40,7 @@
+ #define DEFAULT_DB_DB "rtg"
+ #define DEFAULT_DB_USER "snmp"
+ #define DEFAULT_DB_PASS "rtgdefault"
++#define DEFAULT_ZMQ_URL "tcp://localhost:5555"
+ #define DEFAULT_SNMP_VER 1
+ #define DEFAULT_SNMP_PORT 161
+ 
+@@ -81,9 +82,11 @@
+     char dbdb[80];
+     char dbuser[80];
+     char dbpass[80];
++    char zmqurl[80];
+     enum debugLevel verbose;
+     unsigned short withzeros;
+     unsigned short dboff;
++    unsigned short zmqon;
+     unsigned short multiple;
+     unsigned short snmp_ver;
+     unsigned short snmp_port;
+diff -uar rtg-0.7.4.origin/src/rtgpoll.c rtg-0.7.4/src/rtgpoll.c
+--- rtg-0.7.4.origin/src/rtgpoll.c	2003-09-25 17:56:04.000000000 +0200
++++ rtg-0.7.4/src/rtgpoll.c	2014-02-28 23:29:17.029423857 +0100
+@@ -15,6 +15,8 @@
+ char *target_file = NULL;
+ target_t *current = NULL;
+ MYSQL mysql;
++void *mq_socket;
++void *mq_context;
+ int entries = 0;
+ /* dfp is a debug file pointer.  Points to stderr unless debug=level is set */
+ FILE *dfp = NULL;
+@@ -41,7 +43,7 @@
+     config_defaults(&set);
+ 
+     /* Parse the command-line. */
+-    while ((ch = getopt(argc, argv, "c:dhmt:vz")) != EOF)
++    while ((ch = getopt(argc, argv, "c:dhmt:vzZ")) != EOF)
+ 	switch ((char) ch) {
+ 	case 'c':
+ 	    conf_file = optarg;
+@@ -49,6 +51,9 @@
+ 	case 'd':
+ 	    set.dboff = TRUE;
+ 	    break;
++	case 'Z':
++	    set.zmqon = TRUE;
++	    break;
+ 	case 'h':
+ 	    usage(argv[0]);
+ 	    break;
+@@ -142,6 +147,15 @@
+ 	    exit(-1);
+ 	}
+     }
++    if(set.zmqon) {
++      mq_context = zmq_init(3);
++      mq_socket = zmq_socket(mq_context, ZMQ_PUB);
++      if(zmq_connect(mq_socket, set.zmqurl) != 0) {
++        fprintf(stderr, "Could not connect to ZMQ using URL '%s'\n",
++            set.zmqurl);
++      }
++      printf("Connected to ZMQ using URL '%s'\n", set.zmqurl);
++    }
+     if (set.verbose >= HIGH)
+ 	printf("\nStarting threads.\n");
+ 
+@@ -209,6 +223,11 @@
+     /* Disconnect from the MySQL Database, exit. */
+     if (!(set.dboff))
+ 	rtg_dbdisconnect(&mysql);
++    if (set.zmqon) {
++      zmq_close(mq_socket);
++      zmq_term(mq_context);
++    }
++
+     exit(0);
+ }
+ 
+@@ -243,7 +262,13 @@
+             case SIGQUIT:
+                 if (set.verbose >= LOW)
+                    printf("Quiting: received signal %d.\n", sig_number);
+-                rtg_dbdisconnect(&mysql);
++                if (!(set.dboff)) {
++                  rtg_dbdisconnect(&mysql);
++                }
++                if (set.zmqon) {
++                  zmq_close(mq_socket);
++                  zmq_term(mq_context);
++                }
+                 unlink(PIDFILE);
+                 exit(1);
+                 break;
+@@ -255,7 +280,7 @@
+ void usage(char *prog)
+ {
+     printf("rtgpoll - RTG v%s\n", VERSION);
+-    printf("Usage: %s [-dmz] [-vvv] [-c <file>] -t <file>\n", prog);
++    printf("Usage: %s [-dmzZ] [-vvv] [-c <file>] -t <file>\n", prog);
+     printf("\nOptions:\n");
+     printf("  -c <file>   Specify configuration file\n");
+     printf("  -d          Disable database inserts\n");
+@@ -263,6 +288,7 @@
+     printf("  -v          Increase verbosity\n");
+ 	printf("  -m          Allow multiple instances\n");
+ 	printf("  -z          Database zero delta inserts\n");
++	printf("  -Z          Use ZeroMQ to send samples\n");
+     printf("  -h          Help\n");
+     exit(-1);
+ }
+diff -uar rtg-0.7.4.origin/src/rtgsnmp.c rtg-0.7.4/src/rtgsnmp.c
+--- rtg-0.7.4.origin/src/rtgsnmp.c	2003-09-25 20:23:35.000000000 +0200
++++ rtg-0.7.4/src/rtgsnmp.c	2014-02-28 23:46:39.604007530 +0100
+@@ -23,6 +23,7 @@
+ extern target_t *current;
+ extern stats_t stats;
+ extern MYSQL mysql;
++extern void *mq_socket;
+ 
+ void *poller(void *thread_args)
+ {
+@@ -207,6 +208,31 @@
+ 			PT_MUTEX_UNLOCK(&stats.mutex);
+ 	    }
+ 
++		if (set.zmqon) {
++      zmq_msg_t msg;
++      time_t ts;
++      uint64_t *data;
++
++      ts = time(NULL);
++
++      if (zmq_msg_init_size(&msg, sizeof(uint64_t)*3) != 0) {
++        fprintf(stderr, "Failed to create ZMQ message\n");
++        continue;
++      }
++
++      data = zmq_msg_data(&msg);
++      data[0] = (uint64_t)entry->iid;
++      data[1] = (uint64_t)insert_val;
++      data[2] = (uint64_t)ts;
++
++      if (zmq_send(mq_socket, &msg, ZMQ_NOBLOCK) != 0) {
++        fprintf(stderr, "Failed to send to ZMQ, maybe queue is full?\n");
++        continue;
++      }
++
++      zmq_msg_close(&msg);
++		} /* zmqon */
++
+ 		if (!(set.dboff)) {
+ 			if ( (insert_val > 0) || (set.withzeros) ) {
+ 				PT_MUTEX_LOCK(&crew->mutex);
+@@ -225,6 +251,7 @@
+ 			} /* insert_val > 0 or withzeros */	
+ 		} /* !dboff */
+ 
++
+ 	} /* STAT_SUCCESS */
+ 
+         if (sessp != NULL) {
+diff -uar rtg-0.7.4.origin/src/rtgutil.c rtg-0.7.4/src/rtgutil.c
+--- rtg-0.7.4.origin/src/rtgutil.c	2003-09-25 17:56:04.000000000 +0200
++++ rtg-0.7.4/src/rtgutil.c	2014-02-28 22:56:56.807421177 +0100
+@@ -37,6 +37,7 @@
+               else if (!strcasecmp(p1, "DB_Database")) strncpy(set->dbdb, p2, sizeof(set->dbdb));
+               else if (!strcasecmp(p1, "DB_User")) strncpy(set->dbuser, p2, sizeof(set->dbuser));
+               else if (!strcasecmp(p1, "DB_Pass")) strncpy(set->dbpass, p2, sizeof(set->dbpass));
++              else if (!strcasecmp(p1, "ZMQ_Url")) strncpy(set->zmqurl, p2, sizeof(set->zmqurl));
+ 
+ /* Long longs not ANSI C.  If OS doesn't support atoll() use default. */
+               else if (!strcasecmp(p1, "OutOfRange")) 
+@@ -110,7 +111,9 @@
+    strncpy(set->dbdb, DEFAULT_DB_DB, sizeof(set->dbhost));
+    strncpy(set->dbuser, DEFAULT_DB_USER, sizeof(set->dbhost));
+    strncpy(set->dbpass, DEFAULT_DB_PASS, sizeof(set->dbhost));
++   strncpy(set->zmqurl, DEFAULT_ZMQ_URL, sizeof(set->zmqurl));
+    set->dboff = FALSE;
++   set->zmqon = FALSE;
+    set->withzeros = FALSE;
+    set->verbose = OFF; 
+    strncpy(config_paths[0], CONFIG_PATH_1, sizeof(config_paths[0]));
