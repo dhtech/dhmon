@@ -1,0 +1,6 @@
+"handlers": {
+  "default": {
+    "type": "set",
+    "handlers": ["irc"]
+  },
+}

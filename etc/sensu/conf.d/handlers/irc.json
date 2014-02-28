@@ -1,0 +1,12 @@
+{
+  "handlers": {
+    "irc": {
+      "type": "pipe",
+      "command": "/etc/sensu/handlers/irc.rb",
+      "severities": [
+        "critical",
+        "ok"
+      ]
+    }
+  }
+}

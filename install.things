@@ -1,0 +1,162 @@
+# Things will be missing, first iteration of dump of things to install
+
+--- graphite
+
+dpkg -i graphite_debs/*.deb
+
+vim /etc/graphite/local_settings.py
+vim /etc/default/carbon-cache
+
+cd /usr/share/pyshared/graphite/
+python manage.py syncdb
+chown _graphite:_graphite /var/lib/graphite/graphite.db
+
+ln -sf /usr/share/graphite-web/apache2-graphite.conf /etc/apache2/sites-enabled/
+
+a2dissite default
+
+open service port: 80
+
+--- rtg (/rtg-0.7.4)
+apt-get install libmysqlclient-dev libsnmp-dev
+
+./configure --prefix=/opt/rtg --with-snmp=/usr --with-mysql=/usr MYSQL_LIB_DIR=/usr/lib/i386-linux-gnu/
+-or-
+./configure --prefix=/opt/rtg --with-snmp=/usr --with-mysql=/usr MYSQL_LIB_DIR=/usr/lib/x86_64-linux-gnu/
+
+make
+make install
+
+# Max 10 threads, might need to run multiple workers?
+# 100 000 targets each 60s = 1 700 QPS, 170 QPS per thread
+cat << _EOF_ > /opt/rtg/etc/rtg.conf
+Interval	10
+HighSkewSlop	3
+LowSkewSlop	.5
+OutOfRange	93750000000
+SNMP_Ver	1
+SNMP_Port       161
+Threads 	10
+_EOF_
+
+# See rtg README for options in targets.cfg
+cat << _EOF_ > targets.cfg
+127.0.0.1 .1.3.6.1.2.1.1.3.0 0	public	my_metric	1
+127.0.0.1 .1.3.6.1.2.1.1.3.0 64	public	my_metric	2
+_EOF_
+
+/opt/rtg/bin/rtgpoll -t targets.cfg -v
+
+--- rabbitmq
+
+apt-get install -y erlang-nox
+dpkg -i rabbitmq_debs/*.deb
+
+rabbitmqctl add_vhost /sensu
+rabbitmqctl add_user sensu ${RABBIT_SENSU_PASSWORD?}
+rabbitmqctl set_permissions -p /sensu sensu ".*" ".*" ".*"
+rabbitmq-plugins enable rabbitmq_management
+
+open service port: 5672
+open management port: 15672
+
+--- redis
+
+apt-get install redis-server
+
+--- sensu
+
+wget -q http://repos.sensuapp.org/apt/pubkey.gpg -O- | sudo apt-key add -
+echo "deb     http://repos.sensuapp.org/apt sensu main" > /etc/apt/sources.list.d/sensu.list
+
+apt-get update
+apt-get install sensu
+
+# NOTE: We can break up / combine these in any way we want, this
+# was the way they did it in the documentation.
+# Read /etc/sensu/conf.d/README and /etc/sensu/config.json.example for more
+# info.
+
+# On all machines that talk to monserver over Sensu
+# TOOD: ssl here
+cat << _EOF_ > /etc/sensu/conf.d/rabbitmq.json
+{
+  "rabbitmq": {
+    "host": "dhmon-devel.tech.dreamhack.se",
+    "port": 5672,
+    "vhost": "/sensu",
+    "user": "sensu",
+    "password": "${RABBIT_SENSU_PASSWORD?}"
+  }
+}
+_EOF_
+
+cat << _EOF_ > /etc/sensu/conf.d/client.json
+{
+  "client": {
+    "name": "$(hostname)",
+    "address": "$(hostname -f)",
+    "subscriptions": [ "all" ]
+  }
+}
+_EOF_
+
+# From here on: monserver only
+cat << _EOF_ > /etc/sensu/conf.d/rabbitmq.json
+{
+  "rabbitmq": {
+    "host": "localhost",
+    "port": 5672,
+    "vhost": "/sensu",
+    "user": "sensu",
+    "password": "${RABBIT_SENSU_PASSWORD?}"
+  }
+}
+_EOF_
+
+cat << _EOF_ > /etc/sensu/conf.d/client.json
+{
+  "client": {
+    "name": "monserver",
+    "address": "$(hostname -f)",
+    "subscriptions": [ "all" ]
+  }
+}
+_EOF_
+
+cat << _EOF_ > /etc/sensu/conf.d/redis.json
+{
+  "redis": {
+    "host": "localhost",
+    "port": 6379
+  }
+}
+_EOF_
+cat << _EOF_ > /etc/sensu/conf.d/api.json
+{
+  "api": {
+    "host": "localhost",
+    "port": 4567,
+    "user": "admin",
+    "password": "${SENSU_API_PASSWORD?}"
+  }
+}
+_EOF_
+
+cat << _EOF_ > /etc/sensu/conf.d/dashboard.json
+{
+  "dashboard": {
+    "port": 8012,
+    "user": "admin",
+    "password": "${SENSU_DASHBOARD_API?}"
+  }
+}
+_EOF_
+
+update-rc.d sensu-server defaults
+update-rc.d sensu-client defaults
+update-rc.d sensu-api defaults
+update-rc.d sensu-dashboard defaults
+
+open api ports: 4567
+open management ports: 8012
