@@ -1,0 +1,19 @@
+{
+  "models": {
+    "WS-C2960G-8TC-L": [
+      "cisco-switch"
+    ],
+    "WS-C2950T-24": [
+      "cisco-switch"
+    ]
+  },
+
+  "objects": {
+    "cisco-switch": {
+      "1.3.6.1.2.1.2.2": "ifTable",
+      "1.3.6.1.2.1.1.3": "sysUpTimeInstance",
+      "1.3.6.1.4.1.9.2.1": "lcpu",
+      "1.3.6.1.2.1.31.1.1": "ifXTable"
+    }
+  }
+}
