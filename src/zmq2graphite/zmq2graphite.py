@@ -48,8 +48,12 @@ class zmq2graphite(object):
       error_cnt = 0
       try:
         logging.debug( 'Waiting for data...' )
-        raw = self.zmq_socket.recv( 8*3 )
-        data = struct.unpack( 'QQQ', raw )
+        raw = self.zmq_socket.recv()
+        (iid, value, insert_value, ts, element_size, name_length) = struct.unpack( '4QII', raw[0:40])
+
+        oid_payload = raw[40:40+name_length*element_size]
+        oid = struct.unpack('%d%s' % (name_length, 'Q' if element_size == 8 else 'I'), oid_payload)
+        name = '.'.join(map(str, oid))
 
         # FIXME Ugly
         id_to_path = { 
@@ -57,7 +61,7 @@ class zmq2graphite(object):
             2 : 'dh.server.birdjesus',
         }
 
-        graphite_msg = [( id_to_path.get( data[0], 'null' ), ( data[2], data[1] ) )]
+        graphite_msg = [( '%s.%s' % ( id_to_path.get( iid, 'null' ), name ), ( ts, insert_value ) )]
         logging.debug( graphite_msg )
         payload = pickle.dumps( graphite_msg )
         header = struct.pack( "!L", len( payload ) )
