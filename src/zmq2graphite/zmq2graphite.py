@@ -1,3 +1,4 @@
+import collections
 import cPickle as pickle
 import logging
 import socket
@@ -21,6 +22,7 @@ class zmq2graphite(object):
   def __init__(self, zmq=("*", 5555), graphite=("127.0.0.1", 2004) ):
     self.zmq_url= "tcp://%s:%d" % zmq
     self.graphite_address = graphite
+    self.stats = collections.Counter()
     self._connectZMQ()
     self._connectGraphite()
 
@@ -36,6 +38,7 @@ class zmq2graphite(object):
 
   def _connectGraphite(self):
     try:
+      self.stats['*.graphite_connects'] += 1
       self.graphite_socket = socket.socket()
       self.graphite_socket.connect( self.graphite_address )
     except Exception as e:
@@ -44,10 +47,12 @@ class zmq2graphite(object):
       sys.exit(2)
 
   def translate(self):
+    error_cnt = 0
     while True:
-      error_cnt = 0
       try:
-        logging.debug( 'Waiting for data...' )
+        logging.debug( 'Waiting for data... (total %d recorded stats)' % (
+          len( set( self.stats ) ) ) )
+
         raw = self.zmq_socket.recv()
         (iid, value, insert_value, ts, element_size, name_length) = struct.unpack( '4QII', raw[0:40])
 
@@ -59,15 +64,21 @@ class zmq2graphite(object):
         id_to_path = { 
             1 : 'dh.server.monserver',
             2 : 'dh.server.birdjesus',
+            188 : 'dh.switch.access.bc-core',
+            189 : 'dh.switch.access.bc-24port',
         }
 
-        graphite_msg = [( '%s.%s' % ( id_to_path.get( iid, 'null' ), name ), ( ts, insert_value ) )]
+        fullpath = '%s.%s' % ( id_to_path.get( iid, 'null' ), name )
+        self.stats[fullpath] += 1
+
+        graphite_msg = [( fullpath, ( ts, insert_value ) )]
         logging.debug( graphite_msg )
         payload = pickle.dumps( graphite_msg )
         header = struct.pack( "!L", len( payload ) )
         self.graphite_socket.send( header + payload )
         error_cnt = 0
       except Exception as e:
+        self.stats['*.exceptions'] += 1
         error_cnt += 1
         logging.error( 'Error while handling packet: %s', e )
         if error_cnt > 10:
