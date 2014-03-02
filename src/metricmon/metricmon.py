@@ -41,11 +41,11 @@ def pollMetrics():
   if not results:
     return
 
-  for target, check, code, message in results:
+  for (target, instance), check, code, message in results:
     result = {
         'client': 'metricmon',
         'check': {
-          'name': '%s-%s' % (target, check),
+          'name': '%s-%s-%s' % (target, instance, check),
           'issued': int(time.time()),
           'output': message,
           'status': code,

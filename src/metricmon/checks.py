@@ -22,9 +22,11 @@ class Checks(object):
 
   def run(self):
     self._results = []
+
     # TODO(bluecmd): threading pool?
-    self.access_ifSpeed('15min', 'min')
-    self.access_uplinkTraffic('15min')
+    # Add your metric here
+    self.accessIfSpeed('15min', 'min')
+    self.accessUplinkTraffic('5min')
 
     # Clear events that are not firing anymore
     current_events = set()
@@ -47,8 +49,8 @@ class Checks(object):
     query['format'] = 'json'
     query['from'] = '-%s' % time
     query['until'] = '-1min'
-    aliased_targets = ["aliasSub(%s,'^.*dh\.(.*?)\.1.*$','%s|\\1')" % (
-      target, target_id) for target_id, target in targets]
+    aliased_targets = ["aliasSub(%s,'^.*dh\.(.*?)\.[0-9\.]*\.([0-9]+).*$','%s|\\1|\\2')" % (
+      target, target_id) for target_id, target in enumerate(targets)]
 
     url = 'http://localhost:8011/render/?%s&%s' % (
         urllib.urlencode(query),
@@ -56,61 +58,79 @@ class Checks(object):
     data = urllib2.urlopen(url)
     retdict = collections.defaultdict(dict)
     for target in json.loads(data.read()):
-      target_id, target_name = target['target'].split('|', 1)
-      retdict[target_id][target_name] = target['datapoints']
-    return [retdict[target_id] for target_id, _ in targets]
+      print target
+      target_id, target_name, instance = target['target'].split('|', 2)
+      retdict[int(target_id)][(target_name, instance)] = target['datapoints']
+    return [retdict[target_id] for target_id in range(0, len(targets))]
 
   def _targetToDns(self, target):
     return '.'.join(reversed(target.split('.')))
 
-  def _warning(self, target, message):
+  def _warning(self, target, instance, message):
     check = inspect.stack()[1][3]
-    self._results.append((self._targetToDns(target), check, WARNING, message))
+    self._results.append(((self._targetToDns(target), instance),
+      check, WARNING, message))
 
-  def _critical(self, target, message):
+  def _critical(self, target, instance, message):
     check = inspect.stack()[1][3]
-    self._results.append((self._targetToDns(target), check, CRITICAL, message))
+    self._results.append(((self._targetToDns(target), instance),
+      check, CRITICAL, message))
 
-  def access_ifSpeed(self, time, method):
+  def accessIfSpeed(self, time, method):
     # ifHighSpeed
     oid = '1.3.6.1.2.1.31.1.1.1.15.*'
-    link_speed_query = ('link-speed',
+    link_speed_query = (
       "summarize(dh.local.dreamhack.event.*.%s,'%s','%s',true)" % (
         oid, time, method))
 
     (link_speed, ) = self._get(time, link_speed_query)
 
     if method == 'avg' or method == 'min':
-      for target, data in link_speed.iteritems():
+      for (target, instance), data in link_speed.iteritems():
         if latest(data) != 1000:
-          self._warning(target, 'Uplink slower than 1 Gbps, is %d Mbps' % (
+          self._warning(target, instance, 'Interface slower than 1 Gbps, is %d Mbps' % (
             latest(data),))
 
-  def access_uplinkTraffic(self, time):
+  def accessUplinkTraffic(self, time):
     # ifHcInOctets
     in_oid  = '1.3.6.1.2.1.31.1.1.1.6.*'
     # ifHcOutOctets
     out_oid = '1.3.6.1.2.1.31.1.1.1.10.*'
+    # ifHighSpeed
+    speed_oid = '1.3.6.1.2.1.31.1.1.1.15.*'
 
-    in_query = ('in-trafic',
+    in_query = (
       "summarize(scale(dh.local.dreamhack.event.*.%s,0.033),'%s','avg',true)" % (
         in_oid, time))
 
-    out_query = ('out-trafic',
+    out_query = (
       "summarize(scale(dh.local.dreamhack.event.*.%s,0.033),'%s','avg',true)" % (
         out_oid, time))
 
-    (traffic_in, traffic_out) = self._get(time, in_query, out_query)
+    speed_query = (
+      "summarize(dh.local.dreamhack.event.*.%s,'%s','max',true)" % (
+        speed_oid, time))
 
-    for target, data in traffic_in.iteritems():
+    (traffic_in, traffic_out, if_speed) = self._get(
+        time, in_query, out_query, speed_query)
+
+    for (target, instance), data in traffic_in.iteritems():
       # traffic is in Mbits/s
-      traffic = latest(data) / 10**6 * 8
-      if traffic > 900:
-        self._critical(target, 'Traffic level on uplink extreme, is %d Mbits/s' % (
-          traffic,))
-      elif traffic > 700:
-        self._warning(target, 'Traffic level on uplink high, is %d Mbits/s' % (
-          traffic,))
+      in_traffic = latest(data) / 10**6 * 8
+      out_traffic = latest(traffic_out[(target, instance)]) / 10**6 * 8
+      speed = latest(if_speed[(target, instance)])
+      in_utilization = float(in_traffic)/speed
+      out_utilization = float(out_traffic)/speed
+      max_utilization = max(in_utilization, out_utilization)
+      if max_utilization > 0.9:
+        self._critical(target, instance, 'Traffic level on interface extreme, '
+            'is %d%% (%d Mbit/s) in %d%% (%d Mbit/s) out' % (
+              in_utilization*100, in_traffic, out_utilization*100, out_traffic))
+      elif max_utilization > 0.7:
+        self._warning(target, instance, 'Traffic level on interface high, '
+            'is %d%% (%d Mbit/s) in %d%% (%d Mbit/s) out' % (
+              in_utilization*100, in_traffic, out_utilization*100, out_traffic))
+
 
 if __name__ == '__main__':
   c = Checks()
