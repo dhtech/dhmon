@@ -37,7 +37,7 @@ def pollMetrics():
   keepalive()
   logging.debug('Polling metrics ..')
 
-  results = checks.Checks().run()
+  results = checker.run()
   if not results:
     return
 
@@ -58,6 +58,7 @@ def pollMetrics():
 
 if __name__ == '__main__':
   mq = connectMq()
+  checker = checks.Checks()
   scheduler = sched.scheduler(time.time, time.sleep)
   scheduler.enter(START_PERIOD, 1, pollMetrics, ())
 
