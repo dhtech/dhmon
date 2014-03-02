@@ -41,6 +41,7 @@ def pollMetrics():
   if not results:
     return
 
+  logging.info('Publishing %d results', len(results))
   for (target, instance), check, code, message in results:
     result = {
         'client': 'metricmon',
@@ -52,7 +53,7 @@ def pollMetrics():
           'standalone': True
           }
         }
-    logging.info('Publishing result %s', result)
+    logging.debug('Publishing: %s', result)
     mq.basic_publish(exchange='', routing_key='results',
         body=json.dumps(result))
 

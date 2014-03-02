@@ -42,7 +42,7 @@ class Checks(object):
     for target, check in non_firing:
       self._results.append((target, check, OK, 'Metric returned to normal'))
 
-    print 'Current events: ', current_events
+    print 'Events that appeared: ', current_events - self._active_events
     print 'Events that stopped: ', non_firing
 
     self._active_events = current_events
@@ -62,7 +62,6 @@ class Checks(object):
     data = urllib2.urlopen(url)
     retdict = collections.defaultdict(dict)
     for target in json.loads(data.read()):
-      print target
       target_id, target_name, instance = target['target'].split('|', 2)
       retdict[int(target_id)][(target_name, instance)] = target['datapoints']
     return [retdict[target_id] for target_id in range(0, len(targets))]
