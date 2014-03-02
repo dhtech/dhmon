@@ -32,17 +32,17 @@ agent.add_plugin('1.3.6.1.4.1.9.2.1.57.0') do
     overdrive = false
   end
  
-  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70) )
+  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70))
 end
 
 # avgBusy5
 agent.add_plugin('1.3.6.1.4.1.9.2.1.58.0') do
-  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70) )
+  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70))
 end
 
 # busyPer
 agent.add_plugin('1.3.6.1.4.1.9.2.1.56.0') do
-  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70) )
+  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70))
 end
 
 port_up = true

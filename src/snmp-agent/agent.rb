@@ -445,6 +445,9 @@ class Agent  # :doc:
 						when GetNextRequest
 							@log.debug "GetNextRequest received"
 							response = process_get_next_request(message)
+						when GetBulkRequest
+							@log.debug "GetBulkRequest received"
+							response = process_get_next_request(message)
 						else
 							raise SNMP::UnknownMessageError.new("invalid message #{message.inspect}")
 					end
