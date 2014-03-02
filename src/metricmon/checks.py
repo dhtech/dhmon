@@ -150,6 +150,10 @@ class Checks(object):
     (status, ) = self._get(time, query)
 
     for (target, instance), data in status.iteritems():
+      # FIXME: read ipplan to detect switches we care about
+      # read redis to check the description if this is an uplink.
+      if target.endswith('bc-office'):
+        continue
       if int(latest(data)) != LINK_UP:
         self._warning(target, instance, 'Interface down')
  
