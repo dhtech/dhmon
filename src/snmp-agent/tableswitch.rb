@@ -12,8 +12,9 @@ agent = SNMP::Agent.new(:address => ARGV[0],
                         :port => 1061,
                         :logger => logger)
 
+$start = Time.now.to_i * 100
 def uptime
-  File.read('/proc/uptime').split(' ')[0].to_f * 100
+  Time.now.to_i * 100 - $start
 end
 
 # entPhysicalModelName
@@ -21,10 +22,27 @@ agent.add_plugin('1.3.6.1.2.1.47.1.1.1.1.13.1') do
   "Tableswitch Mock"
 end
 
-start = uptime
+overdrive = false
 
-agent.add_plugin('1.3.6.1.2.1.25.1.1.0') do
-  SNMP::TimeTicks.new(start)
+# avgBusy1
+agent.add_plugin('1.3.6.1.4.1.9.2.1.57.0') do
+  if rng.rand(1..100) == 1
+    overdrive = true
+  elsif rng.rand(1..30) == 1
+    overdrive = false
+  end
+ 
+  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70) )
+end
+
+# avgBusy5
+agent.add_plugin('1.3.6.1.4.1.9.2.1.58.0') do
+  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70) )
+end
+
+# busyPer
+agent.add_plugin('1.3.6.1.4.1.9.2.1.56.0') do
+  SNMP::Integer.new(overdrive ? rng.rand(90..100) : rng.rand(50..70) )
 end
 
 port_up = true
@@ -47,7 +65,12 @@ agent.add_plugin('1.3.6.1.2.1.2.2.1.5.1') do
     full_speed = !full_speed
     last_change = uptime
   end
-  SNMP::Integer.new((full_speed ? 1000 : 100)*1000000)
+  SNMP::Gauge32.new((full_speed ? 1000 : 100)*1000000)
+end
+
+# ifHighSpeed
+agent.add_plugin('1.3.6.1.2.1.31.1.1.1.15.1') do
+  SNMP::Gauge32.new(full_speed ? 1000 : 100)
 end
 
 # ifLastChange
@@ -59,28 +82,57 @@ traffic_period = 20 * 60 * 100
 traffic_packets = 100000
 traffic_packet_size = 1300
 
+in_octets = 0
+out_octets = 0
+in_pkts = 0
+out_pkts = 0
+
 # ifInOctets
 agent.add_plugin('1.3.6.1.2.1.2.2.1.10.1') do
-  SNMP::Counter32.new((traffic_packet_size*traffic_packets) / 2 * (Math.sin(
-    uptime / traffic_period * 2 * 3.1415) + 1) * interval)
+  in_octets += ((traffic_packet_size*traffic_packets) / 2 * (Math.sin(
+      uptime / traffic_period * 2 * 3.1415) + 1) * interval)
+  SNMP::Counter32.new(in_octets.modulo(2**32))
+end
+
+# ifHCInOctets
+agent.add_plugin('1.3.6.1.2.1.31.1.1.1.6.1') do
+  SNMP::Counter64.new(in_octets.modulo(2**64))
 end
 
 # ifInUcastPkts
 agent.add_plugin('1.3.6.1.2.1.2.2.1.11.1') do
-  SNMP::Counter32.new(traffic_packets / 2 * (Math.sin(
+  in_pkts += (traffic_packets / 2 * (Math.sin(
     uptime / traffic_period * 2 * 3.1415) + 1) * interval)
+  SNMP::Counter32.new(in_pkts.modulo(2**32))
+end
+
+# ifHCInUcastPkts
+agent.add_plugin('1.3.6.1.2.1.31.1.1.1.7.1') do
+  SNMP::Counter64.new(in_pkts.modulo(2**64))
 end
 
 # ifOutOctets
 agent.add_plugin('1.3.6.1.2.1.2.2.1.16.1') do
-  SNMP::Counter32.new((traffic_packet_size*traffic_packets) / 2 * (Math.sin(
+  out_octets += ((traffic_packets*traffic_packet_size) / 2 * (Math.sin(
     uptime / traffic_period * 2 * 3.1415 + 3.1415) + 1) * interval)
+  SNMP::Counter32.new(out_octets.modulo(2**32))
+end
+
+# ifHCOutOctets
+agent.add_plugin('1.3.6.1.2.1.31.1.1.1.10.1') do
+  SNMP::Counter64.new(out_octets.modulo(2**64))
 end
 
 # ifOutUcastPkts
 agent.add_plugin('1.3.6.1.2.1.2.2.1.17.1') do
-  SNMP::Counter32.new(traffic_packets / 2 * (Math.sin(
+  out_pkts += (traffic_packets / 2 * (Math.sin(
     uptime / traffic_period * 2 * 3.1415 + 3.1415) + 1) * interval)
+  SNMP::Counter32.new(out_pkts.modulo(2**32))
+end
+
+# ifHCOutUcastPkts
+agent.add_plugin('1.3.6.1.2.1.31.1.1.1.11.1') do
+  SNMP::Counter64.new(out_pkts.modulo(2**64))
 end
 
 # ifInDiscards
