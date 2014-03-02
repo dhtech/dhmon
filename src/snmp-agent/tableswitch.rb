@@ -90,7 +90,7 @@ out_pkts = 0
 # ifInOctets
 agent.add_plugin('1.3.6.1.2.1.2.2.1.10.1') do
   in_octets += ((traffic_packet_size*traffic_packets) / 2 * (Math.sin(
-      uptime / traffic_period * 2 * 3.1415) + 1) * interval)
+      uptime.to_f / traffic_period * 2 * 3.1415) + 1) * interval)
   SNMP::Counter32.new(in_octets.modulo(2**32))
 end
 
@@ -102,7 +102,7 @@ end
 # ifInUcastPkts
 agent.add_plugin('1.3.6.1.2.1.2.2.1.11.1') do
   in_pkts += (traffic_packets / 2 * (Math.sin(
-    uptime / traffic_period * 2 * 3.1415) + 1) * interval)
+    uptime.to_f / traffic_period * 2 * 3.1415) + 1) * interval)
   SNMP::Counter32.new(in_pkts.modulo(2**32))
 end
 
@@ -114,7 +114,7 @@ end
 # ifOutOctets
 agent.add_plugin('1.3.6.1.2.1.2.2.1.16.1') do
   out_octets += ((traffic_packets*traffic_packet_size) / 2 * (Math.sin(
-    uptime / traffic_period * 2 * 3.1415 + 3.1415) + 1) * interval)
+    uptime.to_f / traffic_period * 2 * 3.1415 + 3.1415) + 1) * interval)
   SNMP::Counter32.new(out_octets.modulo(2**32))
 end
 
@@ -126,7 +126,7 @@ end
 # ifOutUcastPkts
 agent.add_plugin('1.3.6.1.2.1.2.2.1.17.1') do
   out_pkts += (traffic_packets / 2 * (Math.sin(
-    uptime / traffic_period * 2 * 3.1415 + 3.1415) + 1) * interval)
+    uptime.to_f / traffic_period * 2 * 3.1415 + 3.1415) + 1) * interval)
   SNMP::Counter32.new(out_pkts.modulo(2**32))
 end
 
@@ -135,24 +135,33 @@ agent.add_plugin('1.3.6.1.2.1.31.1.1.1.11.1') do
   SNMP::Counter64.new(out_pkts.modulo(2**64))
 end
 
+in_discards = 0
+in_errors = 0
+out_discards = 0
+out_errors = 0
+
 # ifInDiscards
 agent.add_plugin('1.3.6.1.2.1.2.2.1.13.1') do
-  SNMP::Counter32.new(rng.rand(0..10))
+  in_discards += rng.rand(0..10)
+  SNMP::Counter32.new(in_discards)
 end
 
 # ifInErrors
 agent.add_plugin('1.3.6.1.2.1.2.2.1.14.1') do
-  SNMP::Counter32.new(rng.rand(0..10))
+  in_errors += rng.rand(0..10)
+  SNMP::Counter32.new(in_errors)
 end
 
 # ifOutDiscards
 agent.add_plugin('1.3.6.1.2.1.2.2.1.19.1') do
-  SNMP::Counter32.new(rng.rand(0..10))
+  out_discards += rng.rand(0..10)
+  SNMP::Counter32.new(out_discards)
 end
 
 # ifOutErrors
 agent.add_plugin('1.3.6.1.2.1.2.2.1.20.1') do
-  SNMP::Counter32.new(rng.rand(0..10))
+  out_errors += rng.rand(0..10)
+  SNMP::Counter32.new(out_errors)
 end
 
 agent.start()
