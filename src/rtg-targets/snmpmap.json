@@ -5,6 +5,9 @@
     ],
     "WS-C2950T-24": [
       "cisco-switch"
+    ],
+    "Tableswitch Mock": [
+      "cisco-switch"
     ]
   },
 

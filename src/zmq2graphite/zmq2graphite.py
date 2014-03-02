@@ -66,7 +66,7 @@ class zmq2graphite(object):
 
   def dumper(self):
     while True:
-      time.sleep(7)
+      time.sleep(9)
       try:
 
         f = open('zmq2graphite.stats', 'w')
