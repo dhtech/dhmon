@@ -5,7 +5,7 @@
       "command": "/etc/sensu/handlers/irc.rb",
       "severities": [
         "critical",
-        "ok"
+        "warning"
       ]
     }
   }

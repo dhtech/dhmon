@@ -1,6 +1,8 @@
-"handlers": {
-  "default": {
-    "type": "set",
-    "handlers": ["irc"]
-  },
+{
+  "handlers": {
+    "default": {
+      "type": "set",
+      "handlers": ["irc"]
+    }
+  }
 }

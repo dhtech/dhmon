@@ -6,8 +6,11 @@ require 'socket'
 
 class Ircer < Sensu::Handler
   def handle
-
-    line = "dhmon: #{@event['client']['name']}:#{@event['check']['name']} reported #{@event['check']['status']} - output was '#{@event['check']['output']}'"
+    if @event['check']['name'] == 'keepalive':
+      line = "[#{@event['client']['name']}|#{@event['check']['name']}] #{@event['check']['output']}"
+    else
+      line = "[#{@event['check']['name']}]: #{@event['check']['output']}"
+    end
     socket = UDPSocket.new
     socket.connect("77.80.254.70", 9007)
     socket.send line, 0

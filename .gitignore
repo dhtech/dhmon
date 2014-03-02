@@ -2,3 +2,4 @@
 *.db
 *.stats
 build/
+*.pyc
