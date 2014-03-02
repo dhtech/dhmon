@@ -1,0 +1,12 @@
+#!/bin/sh
+
+service sensu-client stop 
+service sensu-server stop
+service sensu-api stop
+service sensu-dashboard stop
+service redis-server stop
+service redis-server start
+service sensu-server start
+service sensu-api start
+service sensu-dashboard start
+service sensu-client start 

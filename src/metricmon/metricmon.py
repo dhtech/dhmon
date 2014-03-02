@@ -7,7 +7,6 @@ import threading
 import sched
 import time
 
-KEEPALIVE_PERIOD = 30
 PERIOD = 30
 START_PERIOD = 5
 
@@ -26,7 +25,6 @@ def connectMq():
   return connection.channel()
 
 def keepalive():
-  scheduler.enter(KEEPALIVE_PERIOD, 1, pollMetrics, ())
   keepalive = {
       'name': 'metricmon',
       'timestamp': int(time.time())
@@ -36,6 +34,7 @@ def keepalive():
 
 def pollMetrics():
   scheduler.enter(PERIOD, 1, pollMetrics, ())
+  keepalive()
   logging.debug('Polling metrics ..')
 
   results = checks.Checks().run()
@@ -46,7 +45,7 @@ def pollMetrics():
     result = {
         'client': 'metricmon',
         'check': {
-          'name': '%s|%s' % (target, check),
+          'name': '%s-%s' % (target, check),
           'issued': int(time.time()),
           'output': message,
           'status': code,
@@ -62,7 +61,6 @@ if __name__ == '__main__':
   scheduler = sched.scheduler(time.time, time.sleep)
   scheduler.enter(START_PERIOD, 1, pollMetrics, ())
 
-  # This will schedule keepalives to be sent every KEEPALIVE_PERIOD
   keepalive()
 
   scheduler.run()
