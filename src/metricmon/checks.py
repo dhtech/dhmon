@@ -11,6 +11,9 @@ WARNING = 1
 CRITICAL = 2
 UNKNOWN = 3
 
+# ifOperStatus
+LINK_UP = 1
+
 def latest(points):
   return points[-1][0]
 
@@ -27,6 +30,7 @@ class Checks(object):
     # Add your metric here
     self.accessIfSpeed('15min', 'min')
     self.accessUplinkTraffic('5min')
+    self.accessLinkDown('5min')
 
     # Clear events that are not firing anymore
     current_events = set()
@@ -83,11 +87,17 @@ class Checks(object):
       "summarize(dh.local.dreamhack.event.*.%s,'%s','%s',true)" % (
         oid, time, method))
 
-    (link_speed, ) = self._get(time, link_speed_query)
+    status_oid  = '1.3.6.1.2.1.2.2.1.8.*'
+    status_query = (
+      "summarize(dh.local.dreamhack.event.*.%s,'%s','max',true)" % (
+        status_oid, time))
+
+    (link_speed, status) = self._get(time, link_speed_query, status_query)
 
     if method == 'avg' or method == 'min':
       for (target, instance), data in link_speed.iteritems():
-        if latest(data) != 1000:
+        if (int(latest(status[(target,instance)])) == LINK_UP 
+            and latest(data) < 1000):
           self._warning(target, instance, 'Interface slower than 1 Gbps, is %d Mbps' % (
             latest(data),))
 
@@ -131,7 +141,19 @@ class Checks(object):
             'is %d%% (%d Mbit/s) in %d%% (%d Mbit/s) out' % (
               in_utilization*100, in_traffic, out_utilization*100, out_traffic))
 
+  def accessLinkDown(self, time):
+    # ifOperStatus
+    oid  = '1.3.6.1.2.1.2.2.1.8.*'
+    query = (
+      "summarize(dh.local.dreamhack.event.*.%s,'%s','max',true)" % (
+        oid, time))
 
+    (status, ) = self._get(time, query)
+
+    for (target, instance), data in status.iteritems():
+      if int(latest(data)) != LINK_UP:
+        self._warning(target, instance, 'Interface down')
+ 
 if __name__ == '__main__':
   c = Checks()
   c._results = []
