@@ -1,8 +1,10 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
   var socket = io.connect('http://localhost');
-  socket.on('news', function (data) {
-    console.log(data);
-    socket.emit('my other event', { my: 'data' });
+  socket.emit('subscribe', 'some.example.path');
+  socket.on('some.example.path', function (data) {
+    document.getElementById('data').innerHTML = data;
   });
 </script>
+
+<h1 id="data"></h1>
