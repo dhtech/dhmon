@@ -1,0 +1,10 @@
+{
+    "name": "analytics"
+  , "version": "0.0.1"
+  , "private": true
+  , "dependencies": {
+      "eureca.io": "0.5.0"
+    , "redis": "0.7.1"
+    , "promised-io": "0.3.0"
+  }
+}
