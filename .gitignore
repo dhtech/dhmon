@@ -3,3 +3,4 @@
 *.stats
 build/
 *.pyc
+node_modules
