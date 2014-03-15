@@ -40,6 +40,12 @@ pushServerApp.get('/', function (request, response) {
   response.redirect('/dashboard');
 });
 
+// Display documentation of all available paths
+pushServerApp.get('/docs', function(request, response) {
+  response.writeHead(200, {"Content-Type": "text/html"});
+  response.end(logic.documentation());
+});
+
 // Set up REST API server
 pushServerApp.get('*', function(request, response, next) {
     // Hand over to next route in case request is for the dashboard
