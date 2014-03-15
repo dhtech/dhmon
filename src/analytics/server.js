@@ -1,8 +1,10 @@
-// Set up logging
-var logger = require('caterpillar').createLogger( { level: 7 });
-var filter = require('caterpillar-filter').createFilter();
-var human = require('caterpillar-human').createHuman();
-logger.pipe(filter).pipe(human).pipe(process.stdout);
+var logger = require('./lib/logger').Logging().get('project-debug.log');
+
+var winstonStream = {
+    write: function(message, encoding){
+        logger.info(message);
+    }
+};
 
 // Import utilities
 var util = require('util');
@@ -13,7 +15,16 @@ var logic = require('./lib/logic');
 // Set up websocket server using socket.io
 var pushServerApp = require('express')()
 var pushServer = require('http').createServer(pushServerApp)
-var io = require('socket.io').listen(pushServer);
+var io = require('socket.io').listen(pushServer,
+{
+  logger: {
+    debug: logger.debug, 
+    info: logger.info, 
+    error: logger.error, 
+    warn: logger.warn
+  }
+ });
+
 io.set('log level', 1);
 var express = require('express');
 
@@ -33,6 +44,7 @@ pushServerApp.configure(function () {
   pushServerApp.use( express.cookieParser() );
   pushServerApp.use( express.session({secret: 'secret', key: 'express.sid'}) );
   pushServerApp.use( pushServerApp.router )
+  pushServerApp.use(express.logger({stream:winstonStream}));
 });
 
 // Redirect the root to the dashboard

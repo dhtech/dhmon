@@ -1,3 +1,4 @@
+var logger = require('./logger').Logging().get('project-debug.log');
 var util = require('util');
 
 // Load Graphite API
@@ -8,9 +9,9 @@ var graphiteClient = graphite.createClient('http://172.16.20.1:9000');
 var redis = require('redis');
 var db = redis.createClient();
 
-
 var someExamplePath = function(callback) {
-graphiteClient.query('server.rojter.load', {'from': '-1min'}, function(data) {
+  graphiteClient.query('server.rojter.load', {'from': '-1min'}, function(data) {
+    logger.debug(data);
     callback(data[0]["datapoints"][0][0]);
   });
 };
@@ -33,6 +34,7 @@ var paths = {
 };
 
 var updateCache = function(path, data, callback) {
+  logger.debug('Updating cache for path:', path);
   data = JSON.stringify(data);
   db.set(path, data, 'NX', 'EX', 60, function(err, reply) {
     callback(data);
