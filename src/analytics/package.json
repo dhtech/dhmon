@@ -3,8 +3,16 @@
   , "version": "0.0.1"
   , "private": true
   , "dependencies": {
-      "eureca.io": "0.5.0"
-    , "redis": "0.7.1"
+      "redis": "0.7.1"
+    , "hiredis": "0.1.16"
+    , "caterpillar": "2.0.7"
+    , "caterpillar-filter": "2.0.3"
+    , "caterpillar-human": "2.1.2"
+    , "restify": "2.6.3"
+    , "socket.io": "0.9.16"
     , "promised-io": "0.3.0"
+    , "express": "3.4.8"
+    , "graphite": "0.0.6"
+    , "request": "2.34.0"
   }
 }
