@@ -7,19 +7,19 @@ var GraphiteAPI = function(server_url) {
 
 exports.GraphiteAPI = GraphiteAPI;
 
-GraphiteAPI.prototype.query = function(query, options) {
+GraphiteAPI.prototype.query = function(query, options, callback) {
+  query = encodeURIComponent(query);
   options = typeof options !== 'undefined' ? options : {};
   var url = util.format("%s/render?target=%s&format=json", this.server_url, query);
   for (var option in options) {
     url += util.format("&%s=%s", option, options[option]);
   }
-  console.log(url);
   request(url, function (error, response, body) {
    if (!error && response.statusCode == 200) {
-    data = JSON.parse(body);
-    return data;
+      data = JSON.parse(body);
+      callback(data);
     } else {
-      return null;
+      callback(null);
     }
   });
 };

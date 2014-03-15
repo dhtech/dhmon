@@ -42,7 +42,7 @@ setInterval(
       }
     } 
   }
-  , 60000
+  , 10000
 );
 
 // Set up REST API server

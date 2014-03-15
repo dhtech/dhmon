@@ -6,8 +6,10 @@ var graphiteClient = graphite.createClient('http://172.16.20.1:9000');
 var redis = require('redis');
 var db = redis.createClient();
 
-var someExamplePath = function() {
-  return { "some": (new Date).getTime() }
+var someExamplePath = function(callback) {
+graphiteClient.query('server.rojter.load', {'from': '-1min'}, function(data) {
+    callback(data[0]["datapoints"][0][0]);
+  });
 };
 
 var paths = {
@@ -25,15 +27,17 @@ var retrieve = function(path, refresh, callback) {
   if ( paths.hasOwnProperty(path) ) {
     var method = paths[path];
     if ( refresh ) {
-      var data = method();
-      updateCache(path, data, callback);
+      method(function(data) {
+        updateCache(path, data, callback)
+      });
     } else {
       var cache = db.get(path, function(err, reply) {
         if ( typeof reply != 'undefined' && reply ) {
           callback(reply);
         } else {
-          var data = method();
-          updateCache(path, data, callback);
+          method(function(data) {
+            updateCache(path, data, callback);
+          });
         }
       });
     }
