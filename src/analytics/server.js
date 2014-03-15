@@ -14,9 +14,11 @@ var logic = require('./lib/logic');
 var pushServerApp = require('express')()
 var pushServer = require('http').createServer(pushServerApp)
 var io = require('socket.io').listen(pushServer);
+io.set('log level', 1);
+var express = require('express');
 
 pushServer.listen(8000, function() {
-  logger.log('info', 'Push API server listening at http://0.0.0.0:8000');
+  logger.log('info', 'Analytics server listening at http://0.0.0.0:8000');
 });
 
 // Allow clients to subscribe to paths
@@ -27,10 +29,35 @@ io.sockets.on('connection', function(socket) {
 });
 
 // Serve static HTML page for websocket server
-pushServerApp.get('/', function (req, res) {
-  res.sendfile(__dirname + '/html/index.html');
- });
+pushServerApp.configure(function () {
+  pushServerApp.use( express.cookieParser() );
+  pushServerApp.use( express.session({secret: 'secret', key: 'express.sid'}) );
+  pushServerApp.use( pushServerApp.router )
+});
 
+// Redirect the root to the dashboard
+pushServerApp.get('/', function (request, response) {
+  response.redirect('/dashboard');
+});
+
+// Set up REST API server
+pushServerApp.get('*', function(request, response, next) {
+    // Hand over to next route in case request is for the dashboard
+    if ( request.url.indexOf('dashboard') != -1 ) {
+      next();
+    }
+    var path = request.url.substring(1);
+    path = path.replace(/\//g, '.').toLowerCase();
+    data = logic.retrieve(path, false, function(data) {
+      response.writeHead(200, {"Content-Type": "application/json"});
+      response.end(data);
+    });
+});
+
+// Serve static assets as well
+pushServerApp.use( express.static(__dirname+'/html') );
+
+// Main event loop
 setInterval( 
   function(){
     for ( path in io.sockets.manager.rooms ) {
@@ -44,21 +71,3 @@ setInterval(
   }
   , 10000
 );
-
-// Set up REST API server
-var http = require('http');
-var url = require('url');
-var restServer = http.createServer(
-  function (request, response) {
-    var path = url.parse(request.url, true).path.substring(1);
-    path = path.replace(/\//g, '.').toLowerCase();
-    data = logic.retrieve(path, false, function(data) {
-      response.writeHead(200, {"Content-Type": "application/json"});
-      response.end(data);
-    });
-  }
-);
-
-restServer.listen(8080, function() {
-  logger.log('info', 'REST API server listening at http://0.0.0.0:8080');
-});
