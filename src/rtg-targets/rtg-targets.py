@@ -55,5 +55,6 @@ for switch_id, switch in switches:
     all_objects.extend( objects.iteritems() )
 
   for oid, label in all_objects:
-    print "%s %s -1 %s %s %s" % (
-        switch, oid, community, label, switch_id )
+    bits = -1 if label[0] != '@' else -2
+    print "%s %s %s %s %s %s" % (
+        switch, oid, bits, community, label, switch_id )

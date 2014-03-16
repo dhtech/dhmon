@@ -12,6 +12,12 @@ import threading
 import time
 import zmq
 
+ASN_INTEGER = 0x02
+ASN_OCTET_STR = 0x04
+ASN_IPADDRESS = 0x40
+ASN_COUNTER = 0x41
+ASN_COUNTER64 = 0x46
+
 root = logging.getLogger()
 
 ch = logging.StreamHandler( sys.stdout )
@@ -20,7 +26,7 @@ formatter = logging.Formatter( '%(asctime)s - %(name)s - '
   '%(levelname)s - %(message)s' )
 ch.setFormatter( formatter )
 root.addHandler( ch )
-root.setLevel( logging.DEBUG )
+root.setLevel( logging.INFO )
 
 class zmq2graphite(object):
 
@@ -116,6 +122,10 @@ class zmq2graphite(object):
     header = struct.pack( "!L", len( payload ) )
     self.graphite_socket.send( header + payload )
 
+  def _sendToRedis(self, path, value, ts):
+
+    return
+
   def translate(self):
     error_cnt = 0
     while True:
@@ -124,10 +134,12 @@ class zmq2graphite(object):
           len( set( self.stats ) ) ) )
 
         raw = self.zmq_socket.recv()
-        (iid, value, insert_value, ts, element_size, name_length) = struct.unpack( '4QII', raw[0:40])
+        (iid, metric_type, element_size, name_length, ts) = struct.unpack(
+            '=QBIIQ', raw[0:25])
 
-        oid_payload = raw[40:40+name_length*element_size]
-        oid = struct.unpack('%d%s' % (name_length, 'Q' if element_size == 8 else 'I'), oid_payload)
+        oid_payload = raw[25:25+name_length*element_size]
+        oid = struct.unpack('%d%s' % (
+          name_length, 'Q' if element_size == 8 else 'I'), oid_payload)
         name = '.'.join(map(str, oid))
 
         hostname = self.nodes.get( iid, 'unknown' )
@@ -138,12 +150,40 @@ class zmq2graphite(object):
         self._incrementStats( fullpath )
         self._incrementStats( '*.inserts' )
 
-        self._sendToGraphite( fullpath, insert_value, ts )
+        value_payload = raw[25+name_length*element_size:]
+        # Is this a processed metric?
+        if metric_type == 0:
+          (value, insert_value) = struct.unpack('QQ', value_payload[0:16])
+          self._sendToGraphite(fullpath, insert_value, ts)
+        else:
+          (length, ) = struct.unpack('I', value_payload[0:4])
+          if length == 0:
+            value = ''
+          elif metric_type == ASN_OCTET_STR:
+            data = struct.unpack('%dB' % length, value_payload[4:4+length])
+            if (min(filter(lambda x: x < 0x7 or x > 0xD , data)) < 0x20 or
+              max(data) > 0x80):
+              value = ('%02x' * length) % data
+            else:
+              value = ''.join(map(chr, data))
+          elif metric_type == ASN_INTEGER or (
+              metric_type >= ASN_COUNTER and metric_type < ASN_COUNTER64):
+            (value, ) = struct.unpack('I', value_payload[4:8])
+          elif metric_type == ASN_COUNTER64:
+            (value, ) = struct.unpack('Q', value_payload[4:12])
+          elif metric_type == ASN_IPADDRESS:
+            data = struct.unpack('%dB' % length, value_payload[4:4+length])
+            value = '%d.%d.%d.%d' %  data
+          else:
+            logging.warn('%s unknown metric type %d', fullpath, metric_type)
+        self._sendToRedis(fullpath, value, ts)
         error_cnt = 0
       except Exception as e:
         self._incrementStats( '*.exceptions' )
         error_cnt += 1
+        import traceback
         logging.error( 'Error while handling packet: %s', e )
+        traceback.print_exc()
         if error_cnt > 10:
           logging.error( 'Reconnecting to Graphite due to too many errors' )
           self._connectGraphite()
