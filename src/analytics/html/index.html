@@ -1,0 +1,10 @@
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  var socket = io.connect('http://localhost');
+  socket.emit('subscribe', 'some.example.path');
+  socket.on('some.example.path', function (data) {
+    document.getElementById('data').innerHTML = data;
+  });
+</script>
+
+<h1 id="data"></h1>
