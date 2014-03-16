@@ -3,6 +3,7 @@ import cPickle as pickle
 import json
 import logging
 import os
+import redis
 import signal
 import socket
 import struct
@@ -11,6 +12,8 @@ import sqlite3
 import threading
 import time
 import zmq
+
+REDIS_DB = 1
 
 ASN_INTEGER = 0x02
 ASN_OCTET_STR = 0x04
@@ -30,7 +33,8 @@ root.setLevel( logging.INFO )
 
 class zmq2graphite(object):
 
-  def __init__(self, database="ipplan.db", zmq=("*", 5555), graphite=("127.0.0.1", 2004) ):
+  def __init__(self, database="ipplan.db", zmq=("*", 5555), graphite=("127.0.0.1", 2004),
+      redis=("127.0.0.1", 6379) ):
     self.total_stats = collections.Counter()
     self.stats = collections.Counter()
     self.graphite_counters = [ 'inserts', 'db_rebuilds', 'db_rebuild_errors',
@@ -39,11 +43,13 @@ class zmq2graphite(object):
     self.hostname = socket.gethostname()
     self.zmq_url= "tcp://%s:%d" % zmq
     self.graphite_address = graphite
+    self.redis_address = redis
     self.database = database
     self.nodes = None
     self.rebuildDict()
     self._connectZMQ()
     self._connectGraphite()
+    self._connectRedis()
 
   def rebuildDict(self, signum=False, frame=None):
     if signum:
@@ -103,6 +109,14 @@ class zmq2graphite(object):
       logging.error( 'Could not bind to ZMQ URL: %s, %s', self.zmq_url, e )
       sys.exit(1)
 
+  def _connectRedis(self):
+    try:
+      self.redis = redis.StrictRedis( host=self.redis_address[0],
+          port=self.redis_address[1], db=REDIS_DB )
+    except Exception as e:
+      logging.error( 'Could not connect to Redis: %s', e )
+      sys.exit(1)
+
   def _connectGraphite(self):
     while True:
       try:
@@ -122,9 +136,10 @@ class zmq2graphite(object):
     header = struct.pack( "!L", len( payload ) )
     self.graphite_socket.send( header + payload )
 
-  def _sendToRedis(self, path, value, ts):
-
-    return
+  def _sendToRedis(self, host, oid, value, ts):
+    self.redis.sadd( 'all:hosts', host )
+    self.redis.sadd( 'all:oids', oid )
+    self.redis.set( '%s:%s' % (host, oid), value )
 
   def translate(self):
     error_cnt = 0
@@ -143,7 +158,7 @@ class zmq2graphite(object):
         name = '.'.join(map(str, oid))
 
         hostname = self.nodes.get( iid, 'unknown' )
-        hostname = '.'.join( reversed( hostname.split('.') ) )
+        rev_hostname = '.'.join( reversed( hostname.split('.') ) )
         fullpath = 'dh.%s.%s' % ( hostname, name )
         if not fullpath in self.total_stats:
           self._incrementStats( '*.unique_objects' )
@@ -176,7 +191,7 @@ class zmq2graphite(object):
             value = '%d.%d.%d.%d' %  data
           else:
             logging.warn('%s unknown metric type %d', fullpath, metric_type)
-        self._sendToRedis(fullpath, value, ts)
+        self._sendToRedis(hostname, name, value, ts)
         error_cnt = 0
       except Exception as e:
         self._incrementStats( '*.exceptions' )
