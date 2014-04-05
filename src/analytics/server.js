@@ -1,3 +1,4 @@
+var config = require('./lib/config').Config(__dirname+'/config.ini').get();
 var logger = require('./lib/logger').Logging().get('project-debug.log');
 
 var winstonStream = {
@@ -28,8 +29,9 @@ var io = require('socket.io').listen(pushServer,
 io.set('log level', 1);
 var express = require('express');
 
-pushServer.listen(8000, function() {
-  logger.log('info', 'Analytics server listening at http://0.0.0.0:8000');
+pushServer.listen(config.analytics.port, function() {
+  logger.log('info', 'Analytics server listening at http://0.0.0.0:%d', 
+    config.analytics.port);
 });
 
 // Allow clients to subscribe to paths
@@ -87,5 +89,5 @@ setInterval(
       }
     } 
   }
-  , 10000
+  , config.analytics.frequency
 );

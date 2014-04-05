@@ -1,13 +1,15 @@
+var config = require('./config').Config(__dirname+'/config.ini').get();
 var logger = require('./logger').Logging().get('project-debug.log');
 var util = require('util');
 
 // Load Graphite API
 var graphite = require('./graphite-api');
-var graphiteClient = graphite.createClient('http://172.16.20.1:9000');
+var graphiteClient = graphite.createClient(util.format('http://%s:%d', 
+      config.graphite.host, config.graphite.port));
 
 // Connect to Redis
 var redis = require('redis');
-var db = redis.createClient();
+var db = redis.createClient(config.redis.port, config.redis.host);
 
 var someExamplePath = function(callback) {
   graphiteClient.query('server.rojter.load', {'from': '-1min'}, function(data) {
