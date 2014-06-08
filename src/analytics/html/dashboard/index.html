@@ -1,6 +1,6 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
-  var socket = io.connect('http://localhost');
+  var socket = io.connect();
   socket.emit('subscribe', 'services.c7000.load1min');
   socket.on('services.c7000.load1min', function (data) {
     document.getElementById('data').innerHTML = data;
