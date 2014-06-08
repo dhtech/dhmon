@@ -1,34 +1,10 @@
-<html>
-<head>
-  <title>Hey</title>
-  <script type="text/javascript" src="application.js"></script>
-  <link rel="stylesheet" type="text/css" href="application.css">
-</head>
-<body>
-  <div id="container">
-    <div class="gridster">
-      <ul>
-        <li data-row="1" data-col="1" data-sizex="2" data-sizey="1">
-          <div data-id="welcome" data-view="Text" data-title="Hello" data-text="This is your shiny new dashboard." data-moreinfo="Protip: You can drag the widgets around!"></div>
-        </li>
-    
-        <li data-row="1" data-col="1" data-sizex="1" data-sizey="1">
-          <div data-id="synergy" data-view="Meter" data-title="Synergy" data-min="0" data-max="100"></div>
-        </li>
-    
-        <li data-row="1" data-col="1" data-sizex="1" data-sizey="2">
-          <div data-id="buzzwords" data-view="List" data-unordered="true" data-title="Buzzwords" data-moreinfo="# of times said around the office"></div>
-        </li>
-    
-        <li data-row="1" data-col="1" data-sizex="1" data-sizey="1">
-          <div data-id="valuation" data-view="Number" data-title="Current Valuation" data-moreinfo="In billions" data-prefix="$"></div>
-        </li>
-    
-        <li data-row="1" data-col="1" data-sizex="2" data-sizey="1">
-          <div data-id="convergence" data-view="Graph" data-title="Convergence" style="background-color:#ff9618"></div>
-        </li>
-      </ul>
-    </div>
-  </div>
-</body>
-</html>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  var socket = io.connect('http://localhost');
+  socket.emit('subscribe', 'services.c7000.load1min');
+  socket.on('services.c7000.load1min', function (data) {
+    document.getElementById('data').innerHTML = data;
+  });
+</script>
+
+<h1 id="data"></h1>
