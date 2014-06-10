@@ -1,0 +1,16 @@
+#!/bin/bash
+
+cd /var/lib/rancid/dreamhack/configs
+
+TIMESTAMP=$(date +'%s')
+for host in $(sqlite3 /etc/ipplan.db "SELECT h.name FROM host h, option o WHERE o.name = 'rncd' AND h.node_id = o.node_id")
+do
+  MARKER=$(svn info --xml $host \
+    | grep text-updated \
+    | sed 's/<text-updated>\(.*\)<\/text-updated>/\1/' \
+    | xargs -I{} date --date={} +'%s')
+  SIZE=$(wc -c $host | awk '{print $1}')
+
+  dhmon-metric "$TIMESTAMP" "$host" "rancid.updated" "$MARKER"
+  dhmon-metric "$TIMESTAMP" "$host" "rancid.size" "$SIZE"
+done

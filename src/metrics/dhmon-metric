@@ -27,6 +27,5 @@ rev_hostname = '.'.join( reversed( hostname.split('.') ) )
 path = 'dh.%s.%s' % ( rev_hostname, name )
 
 graphite_msg = '%s %s %s\n' % (path, value, ts)
-print graphite_msg
 graphite_socket.send( graphite_msg )
 graphite_socket.close()
