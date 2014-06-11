@@ -13,6 +13,10 @@ var util = require('util');
 // Load data logic module
 var logic = require('./lib/logic');
 
+// Set up ipplan
+var ipplan = require('./lib/ipplan');
+var ipplanDB = ipplan.init(config.ipplan.file);
+
 // Set up websocket server using socket.io
 var pushServerApp = require('express')()
 var pushServer = require('http').createServer(pushServerApp)
@@ -37,8 +41,8 @@ pushServer.listen(config.analytics.port, function() {
 // Allow clients to subscribe to paths
 io.sockets.on('connection', function(socket) {
     socket.on('subscribe', function(room) {
-    socket.join(room);
-  });
+        socket.join(room);
+    });
 });
 
 // Serve static HTML page for websocket server
@@ -66,6 +70,19 @@ pushServerApp.get('*', function(request, response, next) {
     if ( request.url.indexOf('dashboard') != -1 ) {
       next();
     }
+    if ( request.url.indexOf('/ui/load') == 0 ) {
+      if ( 'hall' in request.query ) {
+          ipplanDB.getObjects(request.query['hall'], function(data) {
+              response.writeHead(200, {"Content-Type": "application/json"});
+              response.end(JSON.stringify(data));
+              logger.log('info', 'Sent objects in hall %s to client %s', 
+                request.query['hall'], request.connection.remoteAddress);
+          });
+      }
+    }
+    if ( request.url.indexOf('/ui/render') != -1 ) {
+        next();
+    }
     var path = request.url.substring(1);
     path = path.replace(/\//g, '.').toLowerCase();
     data = logic.retrieve(path, false, function(data) {
@@ -78,7 +95,7 @@ pushServerApp.get('*', function(request, response, next) {
 pushServerApp.use( express.static(__dirname+'/html') );
 
 // Main event loop
-setInterval( 
+setInterval(
   function(){
     for ( path in io.sockets.manager.rooms ) {
       if ( path ) {
@@ -87,7 +104,7 @@ setInterval(
         io.sockets.in(path).emit(path, data);
        });
       }
-    } 
+    }
   }
   , config.analytics.frequency
 );
