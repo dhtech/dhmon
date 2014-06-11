@@ -70,7 +70,7 @@ pushServerApp.get('*', function(request, response, next) {
     if ( request.url.indexOf('dashboard') != -1 ) {
       next();
     }
-    if ( request.url.indexOf('/ui/load') == 0 ) {
+    if ( request.url.indexOf('/ui/load') != -1 ) {
       if ( 'hall' in request.query ) {
           ipplanDB.getObjects(request.query['hall'], function(data) {
               response.writeHead(200, {"Content-Type": "application/json"});
