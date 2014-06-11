@@ -1,31 +1,15 @@
 #!/usr/bin/env python
-import socket
+import dhmon
 import sys
 
 if len(sys.argv) != 5:
-  print "%s: TIMESTAMP HOSTNAME METRIC VALUE" % sys.argv[0]
+  print "%s: timestamp hostname metric value" % sys.argv[0]
   sys.exit(0)
 
 value = sys.argv[4]
+
 if len(value) == 0:
   sys.exit(0)
 
-# TODO(bluecmd): Write to cassandra?
-graphite_address = ( 'metricstore.event.dreamhack.se', 2003 )
-try:
-  graphite_socket = socket.socket()
-  graphite_socket.connect( graphite_address )
-except Exception as e:
-  print ( 'Could not connect to Graphite on %s, port %d, %s',
-      graphite_address[0], graphite_address[1], e )
-  sys.exit(1)
-
-ts = sys.argv[1]
-hostname = sys.argv[2]
-name = sys.argv[3]
-rev_hostname = '.'.join( reversed( hostname.split('.') ) )
-path = 'dh.%s.%s' % ( rev_hostname, name )
-
-graphite_msg = '%s %s %s\n' % (path, value, ts)
-graphite_socket.send( graphite_msg )
-graphite_socket.close()
+dhmon.metric(timestamp=sys.argv[1], hostname=sys.argv[2], metric=sys.argv[3],
+             value=value)
