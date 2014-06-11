@@ -21,6 +21,12 @@ Install dependencies (described in package.json):
 
 All data is cached in Redis, so either run Redis locally or make sure you can connect to an instance somewhere.
 
+## Run
+
+To run
+
+    nodejs server.js
+
 ## Structure/API
 
 
