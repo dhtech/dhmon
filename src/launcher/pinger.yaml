@@ -1,0 +1,5 @@
+number_of_daemons: 1
+pid: /var/run/dhmon-pinger.pid
+period: 15000
+scripts:
+  - /srv/dhmon/src/metrics/ipplan-pinger
