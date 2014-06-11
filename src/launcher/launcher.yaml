@@ -1,0 +1,5 @@
+number_of_daemons: 10
+period: 6000
+scripts:
+  - sleep 1
+  - sleep 2
