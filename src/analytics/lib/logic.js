@@ -18,6 +18,13 @@ var someExamplePath = function(callback) {
   });
 };
 
+var switchesStatus = function(callback) {
+  graphiteClient.query('dh.local.dreamhack.event.*.ipplan-pinger.us', {'maxDataPoints': 1}, function(data) {
+    logger.debug(data);
+    callback(data);
+  });
+};
+
 var documentation = function() {
   html = "<h1>Avaiable Calls</h1>";
   for ( path in paths ) {
@@ -32,6 +39,10 @@ var paths = {
   "some.example.path": {
     "method": someExamplePath,
     "what": "An example path"
+  },
+  "switches.status": {
+    "method": switchesStatus,
+    "what": "Status of all switched currently being polled"
   }
 };
 
