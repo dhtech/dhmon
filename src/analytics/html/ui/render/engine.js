@@ -56,7 +56,7 @@ $(document).ready(function() {
     ctx = canvas.getContext('2d');
     ctx.canvas.width  = window.innerWidth;
     ctx.canvas.height = window.innerHeight;
-    $.getJSON('/ui/load?hall=' + hall, function(objects) {
+    $.getJSON('../load?hall=' + hall, function(objects) {
        for ( var i in objects ) {
           renders[objects[i]['class']](objects[i]);
        }
