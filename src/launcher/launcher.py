@@ -21,13 +21,11 @@ DAEMONS = int(config['number_of_daemons'])
 ID = int(sys.argv[2])
 OFFSET = (PERIOD / DAEMONS) * ID
 
-previous_cycle = 0
-start_up = True
-
 def execute():
     processes = {}
     for script in config['scripts']:
         args = shlex.split(script)
+	syslog.syslog(syslog.LOG_DEBUG, 'Running "%s"' % script)
         processes[script] = subprocess.Popen(args)
 
     for cmdline, p in processes.iteritems():
@@ -52,6 +50,8 @@ def new_cycle(jitter):
     return elapsed
 
 def main():
+    previous_cycle = 0
+    start_up = True
     while True:
         # Calculate our local 'now' with offset for our daemon index.
         now = (int(time.time() * 1000) - OFFSET)

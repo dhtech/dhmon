@@ -1,4 +1,5 @@
 number_of_daemons: 10
+pid: /tmp/test-launcher.pid
 period: 6000
 scripts:
   - sleep 1
