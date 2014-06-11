@@ -2,7 +2,12 @@
 import socket
 import sys
 
-def metric(timestamp, hostname, metric, value):
+def metric(metric, value, hostname=None, timestamp=None):
+    if timestamp is None:
+        timestamp = int(time.time())
+    if hostname is None:
+        hostname = socetk.getfqdn()
+
     # TODO(bluecmd): Write to cassandra?
     graphite_address = ( 'metricstore.event.dreamhack.se', 2003 )
     try:
