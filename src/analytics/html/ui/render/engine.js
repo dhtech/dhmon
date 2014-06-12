@@ -1,6 +1,9 @@
 var scaling = 3;
 var switches = {};
+var lastStatuses = {};
 var canvas = null;
+
+var COLOURS = { 'GREEN': 'rgb(137,245,108)', 'RED': 'rgb(256,0,0)', 'AMBER': 'rgb(255,191,0)', 'GRAY': 'rgb(212,212,212)' };
 
 function getQueryParams(qs) {
     qs = qs.split("+").join(" ");
@@ -32,19 +35,31 @@ function renderRectangle(object, fillColor) {
 
 function renderSwitch(object) {
     switches[object.name] = object;
-    renderRectangle(object, "rgb(137,245,108)");
+    renderRectangle(object, COLOURS.AMBER);
 }
 
 function renderTable(object) {
-    renderRectangle(object, "rgb(212,212,212)");
+    renderRectangle(object, COLOURS.GRAY);
 }
 
 function setSwitchColor(name, color) {
     renderRectangle(switches[name], color);
 }
 
-function markSwitchAlert(name) {
-    setSwitchColor(name, "rgb(256,0,0)");
+function updateSwitches(statuses) {
+    lastStatuses = statuses;
+    for ( var name in switches ) {
+        if ( statuses[name] === undefined ) {
+            setSwitchColor(name, COLOURS.AMBER);
+        } else {
+            console.log("Found " + name);
+            if ( statuses[name] ) {
+                setSwitchColor(name, COLOURS.GREEN);
+            } else {
+                setSwitchColor(name, COLOURS.RED);
+            }
+        }
+    }
 }
 
 var renders= { 'switch': renderSwitch, 'table': renderTable };
@@ -60,5 +75,11 @@ $(document).ready(function() {
        for ( var i in objects ) {
           renders[objects[i]['class']](objects[i]);
        }
+    });
+    var socket = io.connect();
+    var ev = 'switches.status';
+    socket.emit('subscribe', ev);
+    socket.on(ev, function(data) {
+       updateSwitches(JSON.parse(data));
     });
 });
