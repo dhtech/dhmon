@@ -30,6 +30,12 @@ var io = require('socket.io').listen(pushServer,
   }
  });
 
+// Fall back to xhr-polling
+io.configure(function() {
+   io.set("transports", ["xhr-polling"]);
+   io.set("polling duration", 10);
+});
+
 io.set('log level', 1);
 var express = require('express');
 
@@ -41,6 +47,7 @@ pushServer.listen(config.analytics.port, function() {
 // Allow clients to subscribe to paths
 io.sockets.on('connection', function(socket) {
     socket.on('subscribe', function(room) {
+        logger.log('info', 'Client subscribed to room %s', room);
         socket.join(room);
     });
 });

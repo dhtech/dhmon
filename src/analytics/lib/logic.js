@@ -20,8 +20,22 @@ var someExamplePath = function(callback) {
 
 var switchesStatus = function(callback) {
   graphiteClient.query('dh.local.dreamhack.event.*.ipplan-pinger.us', {'maxDataPoints': 1}, function(data) {
-    logger.debug(data);
-    callback(data);
+    var switches = {};
+    for ( var i in data ) {
+        // Format name to form the hostname
+        var name = data[i]["target"];
+        name = name.split('.');
+        name.splice(0, 1);
+        for ( var j = 0; j < 2; j++ ) {
+            name.splice(name.length-1, 1);
+        }
+        name.reverse();
+        name = name.join(".");
+    
+        // Set status
+        switches[name] = data[i]["datapoints"].length == 0;
+    }
+    callback(switches);
   });
 };
 
