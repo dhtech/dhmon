@@ -19,9 +19,13 @@ if len(args) == 3:
     hostname = args.pop()
 
 metric = args.pop()
-value = eval(args.pop())
+value = args.pop()
 
 if len(value) == 0:
+  sys.exit(0)
+
+value = eval(value)
+if value is None:
   sys.exit(0)
 
 if not dhmon.metric(metric, value, timestamp=timestamp, hostname=hostname):
