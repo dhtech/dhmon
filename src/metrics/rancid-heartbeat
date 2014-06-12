@@ -11,6 +11,6 @@ do
     | xargs -I{} date --date={} +'%s')
   SIZE=$(wc -c $host | awk '{print $1}')
 
-  dhmon-metric "$TIMESTAMP" "$host" "rancid.updated" "$MARKER"
+  dhmon-metric "$TIMESTAMP" "$host" "rancid.updated" "$(($TIMESTAMP - $MARKER)) * 1000"
   dhmon-metric "$TIMESTAMP" "$host" "rancid.size" "$SIZE"
 done

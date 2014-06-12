@@ -19,7 +19,7 @@ if len(args) == 3:
     hostname = args.pop()
 
 metric = args.pop()
-value = args.pop()
+value = eval(args.pop())
 
 if len(value) == 0:
   sys.exit(0)

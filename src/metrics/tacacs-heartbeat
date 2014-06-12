@@ -26,5 +26,5 @@ do
   else
     HOST=$(echo $HOST | awk '{print $1}')
   fi
-  dhmon-metric "$TIMESTAMP" "$HOST" "tacacs.last-login" "$LAST"
+  dhmon-metric "$TIMESTAMP" "$HOST" "tacacs.last-login" "$(($TIMESTAMP - $LAST)) * 1000"
 done
