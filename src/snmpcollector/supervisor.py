@@ -19,9 +19,9 @@ class Supervisor(object):
     self.control_queue.put(self.STOP_TOKEN)
     self.control_queue.join()
 
-  def tick(self):
+  def tick(self, signum, frame):
     logging.debug('Received tick, starting new poll cycle')
-    self.control_queue.put(TICK_TOKEN)
+    self.control_queue.put(self.TICK_TOKEN)
 
   def _new_cycle(self):
     self.work_queue.put('Hej SG')

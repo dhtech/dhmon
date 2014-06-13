@@ -26,10 +26,11 @@ def main():
   root.setLevel( logging.DEBUG )
 
   signal.signal(signal.SIGINT, signal.SIG_IGN)
+  signal.signal(signal.SIGHUP, signal.SIG_IGN)
+  signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
   quit_semaphore = mp.Semaphore(0)
   _supervisor = supervisor.Supervisor()
-  signal.signal(signal.SIGHUP, _supervisor.tick)
 
   _snmp_worker = snmp_worker.SnmpWorker(
       _supervisor.work_queue, SNMP_WORKERS)
@@ -55,10 +56,9 @@ def main():
 
     quit_semaphore.release()
 
+  signal.signal(signal.SIGHUP, _supervisor.tick)
   signal.signal(signal.SIGINT, stop)
-
-  quit_semaphore.acquire()
-  logging.info('Shutdown complete')
+  signal.signal(signal.SIGTERM, stop)
 
 if __name__ == "__main__":
   main()
