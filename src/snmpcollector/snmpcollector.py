@@ -10,8 +10,8 @@ import snmp_worker
 import supervisor
 
 
-SNMP_WORKERS = 100
-RESULT_SAVERS = 10
+SNMP_WORKERS = 1
+RESULT_SAVERS = 1
 
 
 def main():

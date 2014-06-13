@@ -1,4 +1,5 @@
 import Queue
+import datetime
 import logging
 import multiprocessing as mp
 import sqlite3
@@ -28,7 +29,7 @@ class Supervisor(object):
     logging.debug('Received tick, starting new poll cycle')
     self.control_queue.put(self.TICK_TOKEN)
 
-  def _construct_targets(self):
+  def _construct_targets(self, timestamp):
     db = sqlite3.connect('/etc/ipplan.db')
     cursor = db.cursor()
     sql = ("SELECT h.name, o.value FROM host h, option o WHERE o.name = 'layer'"
@@ -40,11 +41,12 @@ class Supervisor(object):
         logging.error('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
         continue
-      nodes[host] = snmp_target.SnmpTarget(host, **layer_config)
+      nodes[host] = snmp_target.SnmpTarget(host, timestamp, **layer_config)
     return nodes
 
   def _new_cycle(self):
-    for target in self._construct_targets().values():
+    timestamp = datetime.datetime.now()
+    for target in self._construct_targets(timestamp).values():
       self.work_queue.put(target)
     logging.debug('New work pushed, length %d', self.work_queue.qsize())
 

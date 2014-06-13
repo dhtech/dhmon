@@ -23,11 +23,10 @@ class SnmpWorker(object):
   def worker(self, pid):
     logging.info('Started SNMP worker thread %d', pid)
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
-      logging.debug('Starting SNMP poll for "%s"', task)
-      import time
-      time.sleep(0.1)
-      logging.debug('Done SNMP poll for "%s"', task)
-      self.result_queue.put('SNMP results for %s' % (task, ))
+      result = task.walk('.1.3.6.1.2.1.31.1.1.1.1')
+      result = task.get('.1.3.6.1.2.1.31.1.1.1.1.1')
+      logging.debug('Done SNMP poll for "%s"', task.host)
+      self.result_queue.put(result)
       self.task_queue.task_done()
 
     self.task_queue.task_done()
