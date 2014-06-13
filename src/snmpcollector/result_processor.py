@@ -1,6 +1,8 @@
 import multiprocessing as mp
 import logging
 
+import snmp_target
+
 
 StopToken = object()
 
@@ -16,6 +18,7 @@ class ResultProcessor(object):
     self.task_queue = task_queue
     self.result_queue = mp.JoinableQueue()
     self.workers = workers
+    self.counter_history = {}
     for pid in range(workers):
       p = mp.Process(target=self.worker, args=(pid, ))
       p.start()
@@ -28,8 +31,25 @@ class ResultProcessor(object):
   def worker(self, pid):
     logging.info('Started result processor thread %d', pid)
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
-      logging.debug('Processing result "%s"', task)
-      self.result_queue.put('Processed %s' % (task, ))
+      #logging.debug('Processing result "%s"', task)
+      filtered_results = {}
+      skip = False
+      for oid, result in task.results.iteritems():
+        if result.type == 'COUNTER64' or result.type == 'COUNTER':
+          path = (task.target.host, oid)
+          old_value = result.value
+          if path in self.counter_history:
+            new_value = int(result.value) - self.counter_history[path]
+            # TODO(bluecmd): Handle wrap-arounds
+            result = snmp_target.ResultTuple(str(new_value), result.type)
+            logging.debug('Result delta: %s', result.value)
+          else:
+            skip = True
+          self.counter_history[path] = int(old_value)
+        if not skip:
+          filtered_results[oid] = result
+
+      self.result_queue.put(filtered_results)
       self.task_queue.task_done()
 
     self.task_queue.task_done()

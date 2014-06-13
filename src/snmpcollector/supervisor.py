@@ -6,6 +6,7 @@ import sqlite3
 import yaml
 
 import snmp_target
+import config
 
 
 class Supervisor(object):
@@ -13,9 +14,8 @@ class Supervisor(object):
   STOP_TOKEN = None
   TICK_TOKEN = 'TICK'
 
-  def __init__(self, config='/etc/snmpcollector.yaml'):
+  def __init__(self):
     logging.info('Starting supervisor')
-    self.config = yaml.load(file(config, 'r'))
     self.control_queue = mp.JoinableQueue()
     self.work_queue = mp.JoinableQueue()
     p = mp.Process(target=self.worker, args=())
@@ -36,10 +36,12 @@ class Supervisor(object):
         "AND h.node_id = o.node_id")
     nodes = {}
     for host, layer in cursor.execute( sql ).fetchall():
-      layer_config = self.config['snmp'].get(layer, None)
+      layer_config = config.config['snmp'].get(layer, None)
       if layer_config is None:
         logging.error('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
+        continue
+      if not host.startswith('b21-a'):
         continue
       nodes[host] = snmp_target.SnmpTarget(host, timestamp, **layer_config)
     return nodes

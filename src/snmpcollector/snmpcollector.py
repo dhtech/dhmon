@@ -4,6 +4,7 @@ import logging
 import signal
 import sys
 
+import config
 import result_processor
 import result_saver
 import snmp_worker
@@ -24,6 +25,8 @@ def main():
   ch.setFormatter( formatter )
   root.addHandler( ch )
   root.setLevel( logging.DEBUG )
+
+  config.load('/etc/snmpcollector.yaml')
 
   signal.signal(signal.SIGINT, signal.SIG_IGN)
   signal.signal(signal.SIGALRM, signal.SIG_IGN)

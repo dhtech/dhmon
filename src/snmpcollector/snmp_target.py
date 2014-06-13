@@ -1,4 +1,8 @@
+import collections
 import netsnmp
+
+SnmpResult = collections.namedtuple('SnmpResult', ['target', 'results'])
+ResultTuple = collections.namedtuple('ResultTuple', ['value', 'type'])
 
 class SnmpTarget(object):
 
@@ -30,11 +34,18 @@ class SnmpTarget(object):
     self._snmp_command(netsnmp.snmpwalk, var)
     ret = {}
     for result in var:
-      ret[result.tag] = (result.val, result.type)
+      ret[result.tag] = ResultTuple(result.val, result.type)
     return ret
 
   def get(self, oid):
     var = netsnmp.Varbind(oid)
     self._snmp_command(netsnmp.snmpget, var)
-    return {var.tag: (var.val, var.type)}
+    return {var.tag: ResultTuple(var.val, var.type)}
 
+  def model(self):
+    model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1')
+    if not model:
+      model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1001')
+    if not model:
+      return None
+    return model.values().pop().value
