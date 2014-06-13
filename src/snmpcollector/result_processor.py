@@ -23,6 +23,7 @@ class ResultProcessor(object):
   def stop(self):
     for pid in range(self.workers):
       self.task_queue.put(self.STOP_TOKEN)
+    self.task_queue.join()
 
   def worker(self, pid):
     logging.info('Started result processor thread %d', pid)

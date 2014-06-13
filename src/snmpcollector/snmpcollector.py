@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 import multiprocessing as mp
 import logging
+import signal
 import sys
 
 import result_processor
 import result_saver
 import snmp_worker
+import supervisor
 
 
 SNMP_WORKERS = 1
@@ -23,9 +25,14 @@ def main():
   root.addHandler( ch )
   root.setLevel( logging.DEBUG )
 
-  snmp_task_queue = mp.JoinableQueue()
+  signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-  _snmp_worker = snmp_worker.SnmpWorker(snmp_task_queue, SNMP_WORKERS)
+  quit_semaphore = mp.Semaphore(0)
+  _supervisor = supervisor.Supervisor()
+  signal.signal(signal.SIGHUP, _supervisor.tick)
+
+  _snmp_worker = snmp_worker.SnmpWorker(
+      _supervisor.work_queue, SNMP_WORKERS)
 
   _result_processor = result_processor.ResultProcessor(
       _snmp_worker.result_queue)
@@ -33,30 +40,25 @@ def main():
   _result_saver = result_saver.ResultSaver(
       _result_processor.result_queue, RESULT_SAVERS)
 
-  #logging.info('Starting result savers')
-  #for pid in range(RESULT_SAVERS):
-  #  p = mp.Process(target=snmp_worker,
-  #      args=(pid, snmp_task_queue, snmp_result_queue))
-  #  p.start()
-  import time
-  time.sleep(1)
+  def stop(signum, frame):
+    logging.info('Stopping supervisor')
+    _supervisor.stop()
 
-  snmp_task_queue.put('Hej SG')
+    logging.info('Stopping SNMP workers')
+    _snmp_worker.stop()
 
-  logging.info('Stopping SNMP workers')
-  _snmp_worker.stop()
-  _snmp_worker.task_queue.join()
+    logging.info('Stopping result processor')
+    _result_processor.stop()
 
-  logging.info('Stopping result processor')
-  _result_processor.stop()
-  _result_processor.task_queue.join()
+    logging.info('Stopping result saver')
+    _result_saver.stop()
 
-  logging.info('Stopping result saver')
-  _result_saver.stop()
-  _result_saver.task_queue.join()
+    quit_semaphore.release()
 
+  signal.signal(signal.SIGINT, stop)
+
+  quit_semaphore.acquire()
   logging.info('Shutdown complete')
-  time.sleep(3)
 
 if __name__ == "__main__":
   main()
