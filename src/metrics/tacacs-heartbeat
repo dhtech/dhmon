@@ -1,0 +1,30 @@
+#!/bin/bash
+
+IFS='
+'
+LATEST=$(for line in $(grep tac_plus /var/log/dh/$(hostname)/all.log \
+                         | grep 'shell login' | awk '{print $1, $2, $3, $6}')
+do
+  DATE=$(date --date="$(echo $line | awk '{print $1, $2, $3}')" +'%s')
+  HOST=$(echo $line | awk '{print $4}' | sed 's/://g')
+  echo $DATE $HOST
+done | sort -k 2 | uniq -f 1 | sort -n)
+
+TIMESTAMP=$(date +'%s') 
+for line in $LATEST
+do
+  LAST=$(echo $line | awk '{print $1}')
+  RAW_HOST=$(echo $line | awk '{print $2}')
+  HOST=$(host $RAW_HOST)
+  if [[ "$?" != "0" ]]; then
+    logger -p warn "Unable to resolve raw host: '$RAW_HOST'"
+    continue
+  fi
+
+  if host $RAW_HOST | grep 'domain name pointer' -q; then
+    HOST=$(echo $HOST | awk '{print $NF}' | sed 's/\.$//')
+  else
+    HOST=$(echo $HOST | awk '{print $1}')
+  fi
+  dhmon-metric "$TIMESTAMP" "$HOST" "tacacs.last-login" "$(($TIMESTAMP - $LAST)) * 1000"
+done

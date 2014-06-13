@@ -24,5 +24,9 @@ value = args.pop()
 if len(value) == 0:
   sys.exit(0)
 
+value = eval(value)
+if value is None:
+  sys.exit(0)
+
 if not dhmon.metric(metric, value, timestamp=timestamp, hostname=hostname):
   sys.exit(1)

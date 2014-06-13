@@ -18,6 +18,27 @@ var someExamplePath = function(callback) {
   });
 };
 
+var switchesStatus = function(callback) {
+  graphiteClient.query('dh.local.dreamhack.event.*.ipplan-pinger.us', {'maxDataPoints': 1}, function(data) {
+    var switches = {};
+    for ( var i in data ) {
+        // Format name to form the hostname
+        var name = data[i]["target"];
+        name = name.split('.');
+        name.splice(0, 1);
+        for ( var j = 0; j < 2; j++ ) {
+            name.splice(name.length-1, 1);
+        }
+        name.reverse();
+        name = name.join(".");
+    
+        // Set status
+        switches[name] = data[i]["datapoints"].length == 0;
+    }
+    callback(switches);
+  });
+};
+
 var documentation = function() {
   html = "<h1>Avaiable Calls</h1>";
   for ( path in paths ) {
@@ -32,6 +53,10 @@ var paths = {
   "some.example.path": {
     "method": someExamplePath,
     "what": "An example path"
+  },
+  "switches.status": {
+    "method": switchesStatus,
+    "what": "Status of all switched currently being polled"
   }
 };
 
