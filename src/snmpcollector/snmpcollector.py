@@ -10,8 +10,8 @@ import snmp_worker
 import supervisor
 
 
-SNMP_WORKERS = 1
-RESULT_SAVERS = 1
+SNMP_WORKERS = 100
+RESULT_SAVERS = 10
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
   root.setLevel( logging.DEBUG )
 
   signal.signal(signal.SIGINT, signal.SIG_IGN)
-  signal.signal(signal.SIGHUP, signal.SIG_IGN)
+  signal.signal(signal.SIGALRM, signal.SIG_IGN)
   signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
   quit_semaphore = mp.Semaphore(0)
@@ -56,9 +56,12 @@ def main():
 
     quit_semaphore.release()
 
-  signal.signal(signal.SIGHUP, _supervisor.tick)
+  signal.signal(signal.SIGALRM, _supervisor.tick)
   signal.signal(signal.SIGINT, stop)
   signal.signal(signal.SIGTERM, stop)
+
+  if len(sys.argv) > 1 and sys.argv[1] == '-d':
+    signal.alarm(1)
 
 if __name__ == "__main__":
   main()

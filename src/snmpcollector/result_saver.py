@@ -25,7 +25,7 @@ class ResultSaver(object):
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
       logging.debug('Saving result "%s"', task)
       import time
-      time.sleep(1)
+      time.sleep(0.1)
       logging.debug('Save complete')
       self.task_queue.task_done()
 

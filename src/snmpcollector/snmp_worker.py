@@ -25,7 +25,7 @@ class SnmpWorker(object):
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
       logging.debug('Starting SNMP poll for "%s"', task)
       import time
-      time.sleep(1)
+      time.sleep(0.1)
       logging.debug('Done SNMP poll for "%s"', task)
       self.result_queue.put('SNMP results for %s' % (task, ))
       self.task_queue.task_done()
