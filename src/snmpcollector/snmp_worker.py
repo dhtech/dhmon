@@ -14,7 +14,7 @@ class SnmpWorker(object):
     logging.info('Starting SNMP workers')
     self.model_oid_cache = {}
     self.task_queue = task_queue
-    self.result_queue = mp.JoinableQueue()
+    self.result_queue = mp.JoinableQueue(1024*1024)
     self.workers = workers
     for pid in range(workers):
       p = mp.Process(target=self.worker, args=(pid, ))
@@ -33,7 +33,7 @@ class SnmpWorker(object):
     oids = set()
     for collection_name, collection in config.config['collection'].iteritems():
       for regexp in collection['models']:
-        if re.match(regexp, model):
+        if 'oids' in collection and re.match(regexp, model):
           oids.update(set(collection['oids']))
           break
     self.model_oid_cache[model] = list(oids)
@@ -43,20 +43,22 @@ class SnmpWorker(object):
     logging.info('Started SNMP worker thread %d', pid)
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
       model = task.model()
-      if model is None:
+      if not model:
         # TODO(bluecmd): Log this failure to a metric
         logging.debug('Unable to collect from %s, cannot get model', task.host)
         self.task_queue.task_done()
         continue
 
+      logging.debug('Object %s is model %s', task.host, model)
       oids = self._gather_oids(model)
       results = {}
       for oid in oids:
         logging.debug('Collecting %s on %s', oid, task.host)
         results.update(task.walk(oid))
 
-      logging.debug('Done SNMP poll for "%s"', task.host)
-      self.result_queue.put(snmp_target.SnmpResult(
+      logging.debug('Done SNMP poll (%d objects) for "%s"',
+          len(results.keys()), task.host)
+      self.result_queue.put_nowait(snmp_target.SnmpResult(
         target=task, results=results))
       self.task_queue.task_done()
 

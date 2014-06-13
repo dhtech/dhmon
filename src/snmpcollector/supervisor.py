@@ -1,8 +1,8 @@
 import Queue
-import datetime
 import logging
 import multiprocessing as mp
 import sqlite3
+import time
 import yaml
 
 import snmp_target
@@ -16,8 +16,8 @@ class Supervisor(object):
 
   def __init__(self):
     logging.info('Starting supervisor')
-    self.control_queue = mp.JoinableQueue()
-    self.work_queue = mp.JoinableQueue()
+    self.control_queue = mp.JoinableQueue(1024)
+    self.work_queue = mp.JoinableQueue(1024*1024)
     p = mp.Process(target=self.worker, args=())
     p.start()
 
@@ -41,15 +41,13 @@ class Supervisor(object):
         logging.error('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
         continue
-      if not host.startswith('b21-a'):
-        continue
       nodes[host] = snmp_target.SnmpTarget(host, timestamp, **layer_config)
     return nodes
 
   def _new_cycle(self):
-    timestamp = datetime.datetime.now()
+    timestamp = time.time()
     for target in self._construct_targets(timestamp).values():
-      self.work_queue.put(target)
+      self.work_queue.put_nowait(target)
     logging.debug('New work pushed, length %d', self.work_queue.qsize())
 
   def worker(self):
