@@ -1,4 +1,3 @@
-import dhmon
 import multiprocessing as mp
 import logging
 
@@ -24,6 +23,8 @@ class ResultSaver(object):
     self.task_queue.join()
 
   def worker(self, pid):
+    import dhmon
+    dhmon.connect()
     logging.info('Started result saver thread %d', pid)
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
       timestamp = int(task.target.timestamp)
@@ -34,7 +35,7 @@ class ResultSaver(object):
       for oid, result in task.results.iteritems():
         if result.type in self.INTEGER_TYPES:
           bulkmetric = dhmon.BulkMetric(timestamp=timestamp,
-              hostname=task.target.host, metric='snmp.%s' % oid,
+              hostname=task.target.host, metric='snmp%s' % oid,
               value=result.value)
           metrics.append(bulkmetric)
           saved += 1
