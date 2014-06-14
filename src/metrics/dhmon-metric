@@ -28,5 +28,7 @@ value = eval(value)
 if value is None:
   sys.exit(0)
 
+# TODO(bluecmd): Move this when we enumerate paths correctly in Cynaite
+dhmon.connect(dhmon.CarbonBackend)
 if not dhmon.metric(metric, value, timestamp=timestamp, hostname=hostname):
   sys.exit(1)

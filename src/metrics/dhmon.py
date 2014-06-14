@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import cassandra.cluster
 import collections
 import socket
 import sys
@@ -9,19 +8,57 @@ import time
 BulkMetric = collections.namedtuple('BulkMetric', [
   'timestamp', 'hostname', 'metric', 'value'])
 
-cluster = None
-session = None
-prepared_insert = None
 
-def connect():
-  global cluster
-  global session
-  global prepared_insert
-  cluster = cassandra.cluster.Cluster(['metricstore.event.dreamhack.se'])
-  session = cluster.connect('metric')
-  sql = ('UPDATE metric SET data = data + ? WHERE tenant = \'\' AND '
-        'rollup = ? AND period = ? AND path = ? AND time = ?')
-  prepared_insert = session.prepare(sql)
+backend = None
+
+
+class CassandraBackend(object):
+
+  def connect(self):
+    import cassandra.cluster
+    self.cluster = cassandra.cluster.Cluster(['metricstore.event.dreamhack.se'])
+    self.session = self.cluster.connect('metric')
+    sql = ('UPDATE metric SET data = data + ? WHERE tenant = \'\' AND '
+          'rollup = ? AND period = ? AND path = ? AND time = ?')
+    self.prepared_insert = self.session.prepare(sql)
+    self.ops = []
+    self.rollup = 30
+    self.period = 86400
+    return True
+
+  def queue(self, timestamp, path, value):
+    self.ops.append(self.session.execute_async(
+      self.prepared_insert, ([value], self.rollup, self.period,
+        path, timestamp)))
+
+  def finish(self):
+    for op in self.ops:
+      op.result()
+
+
+class CarbonBackend(object):
+
+  def connect(self):
+    carbon_address = ('metricstore.event.dreamhack.se', 2003)
+    try:
+      self.carbon_socket = socket.socket()
+      self.carbon_socket.connect(carbon_address)
+    except Exception as e:
+      return False
+    return True
+
+  def queue(self, timestamp, path, value):
+    carbon_msg = '%s %s %s\n' % (path, value, timestamp)
+    self.carbon_socket.send(carbon_msg)
+
+  def finish(self):
+    pass
+
+
+def connect(backend_cls=CassandraBackend):
+  global backend
+  backend = backend_cls()
+  return backend.connect()
 
 
 def metric(metric, value, hostname=None, timestamp=None):
@@ -36,17 +73,18 @@ def metric(metric, value, hostname=None, timestamp=None):
 
 
 def metricbulk(values):
-  if cluster is None:
+  if backend is None:
     connect()
 
   ops = []
   for bulkmetric in values:
     rev_hostname = '.'.join(reversed(bulkmetric.hostname.split('.')))
     path = 'dh.%s.%s' % (rev_hostname, bulkmetric.metric)
-    ops.append(session.execute_async(prepared_insert, ([int(bulkmetric.value)],
-      30, 86400, path, int(bulkmetric.timestamp))))
+    rollup = 30
+    period = 86400
+    timestamp = (int(bulkmetric.timestamp) / rollup) * rollup
+    backend.queue(timestamp, path, int(bulkmetric.value))
 
-  for op in ops:
-    op.result()
+  backend.finish()
 
   return True
