@@ -35,6 +35,43 @@ class PathTree(object):
     return self.children[path[0]].contains(path[1:])
 
 
+class ElasticsearchBackend(object):
+
+  def connect(self):
+    import elasticsearch
+    self.es = elasticsearch.Elasticsearch('metricstore.event.dreamhack.se')
+    self.inserted_paths = 0
+
+  def add_path(self, path, leaf, depth):
+    self.es.index(index='cynaite_paths', doc_type='path', id=path,
+        body={'path': path, 'tenant': '', 'leaf': leaf, 'depth': depth})
+    self.inserted_paths += 1
+
+  def add_path_tree(self, path_tree, prefix=(), skip=(), callback=None):
+    if prefix:
+      leaf = not bool(path_tree.children)
+      path = '.'.join(prefix)
+      if path not in skip:
+        self.add_path(path, leaf, len(prefix))
+        if callback:
+          callback(path)
+
+    for k,v in path_tree.children.iteritems():
+      self.add_path_tree(v, list(prefix) + [k], skip=skip, callback=callback)
+
+  def scan_paths(self):
+    paths = set()
+    res = self.es.search(index='cyanite_paths', search_type='scan',
+        scroll='10m', body={'query': {'match_all': {}}})
+    scroll_id = res['_scroll_id']
+    res = self.es.scroll(scroll_id=scroll_id, scroll='10m')
+    while res['hits']['hits']:
+      paths.update(set([x['_id'] for x in res['hits']['hits']]))
+      res = self.es.scroll(scroll_id=scroll_id, scroll='10m')
+      scroll_id = res['_scroll_id']
+    return paths
+
+
 class CassandraBackend(object):
 
   def connect(self):
@@ -63,34 +100,18 @@ class CassandraBackend(object):
 class CassandraEsBackend(CassandraBackend):
 
   def connect(self):
-    import elasticsearch
-    self.es = elasticsearch.Elasticsearch('metricstore.event.dreamhack.se')
-    self.inserted_paths = 0
-    self.path_cache = PathTree()
+    self.es = ElasticsearchBackend()
+    self.es.connect()
     self.path_tree = PathTree()
     return super(CassandraEsBackend, self).connect()
 
-  def _add_path_tree_to_es(self, prefix, path):
-    if prefix:
-      leaf = not bool(path.children)
-      metric_path = '.'.join(prefix)
-      self.es.index(index='cynaite_paths', doc_type='path', id=metric_path,
-          body={'path': metric_path, 'tenant': '', 'leaf': leaf,
-            'depth': len(prefix)})
-      self.path_cache.update(prefix)
-      self.inserted_paths += 1
-
-    for k,v in path.children.iteritems():
-      self._add_path_tree_to_es(prefix + [k], v)
-
   def queue(self, timestamp, path, value):
     super(CassandraEsBackend, self).queue(timestamp, path, value)
-    if not self.path_cache.contains(path):
-      self.path_tree.update(path.split('.'))
+    self.path_tree.update(path.split('.'))
 
   def finish(self):
     super(CassandraEsBackend, self).finish()
-    self._add_path_tree_to_es([], self.path_tree)
+    self.es.add_path_tree(self.path_tree)
     self.path_tree = PathTree()
 
 

@@ -27,12 +27,21 @@ class PathSaver(object):
       procname.setprocname(self.name)
     except ImportError:
       pass
+    import dhmon
+    es = dhmon.ElasticsearchBackend()
+    es.connect()
+    cache = es.scan_paths()
     logging.info('Started path saver thread %d', pid)
-    count = 0
+    logging.info('Pre-warmed cache with %d entries', len(cache))
+    tree = dhmon.PathTree()
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
-      count += 1
-      if count % 1000 == 0:
-        logging.info('Path counter: %d', count)
+      work = task - cache
+      if work:
+        for path in work:
+          tree.update(path.split('.'))
+        logging.info('Committing paths, %d values currently', len(cache))
+        es.add_path_tree(tree, skip=cache, callback=lambda x: cache.add(x))
+        tree = dhmon.PathTree()
       self.task_queue.task_done()
 
     self.task_queue.task_done()

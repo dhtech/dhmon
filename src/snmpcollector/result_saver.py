@@ -49,8 +49,7 @@ class ResultSaver(object):
           # TODO(bluecmd): Save this to redis
           ignored += 1
 
-      for metric in metrics:
-        self.path_queue.put_nowait(metric.path)
+      self.path_queue.put_nowait(set([metric.path for metric in metrics]))
 
       try:
         dhmon.metricbulk(metrics)
