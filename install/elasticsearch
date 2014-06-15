@@ -18,7 +18,8 @@ cat << EOF > /etc/elasticsearch/elasticsearch.yml
 cluster.name: dhmon-es
 discovery.zen.ping.multicast.enabled: false
 discovery.zen.ping.unicast.hosts: ["metricstore.event.dreamhack.se" ]
-network.host: $IP
+network.bind_host: 0.0.0.0
+network.publish_host: $IP
 EOF
 
 echo 'RESTART_ON_UPGRADE=true' > /etc/default/elasticsearch

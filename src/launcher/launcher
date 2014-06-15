@@ -45,8 +45,8 @@ def new_cycle(jitter):
         syslog.syslog(syslog.LOG_CRIT,
                 'Job dispatch took more than 90%% of the period, %d ms spent' % (
                     elapsed, ))
-    dhmon.metric('dhmon.launcher.%s.jitter' % config['name'], jitter)
-    dhmon.metric('dhmon.launcher.%s.elapsed' % config['name'], elapsed)
+    dhmon.metric('dhmon.%s.launcher.jitter' % config['name'], jitter)
+    dhmon.metric('dhmon.%s.elapsed' % config['name'], elapsed)
     return elapsed
 
 def main():
