@@ -1,48 +1,32 @@
 import logging
 import multiprocessing as mp
+import stage
 
 
-class PathSaver(object):
-
-  STOP_TOKEN = None
+class PathSaver(stage.Stage):
 
   def __init__(self, task_queue):
-    workers = 1
     logging.info('Starting path saver')
-    self.task_queue = task_queue
-    self.workers = workers
-    self.name = 'path_saver'
-    for pid in range(workers):
-      p = mp.Process(target=self.worker, args=(pid, ), name=self.name)
-      p.start()
+    super(PathSaver, self).__init__(task_queue, 'path_saver', workers=1)
 
-  def stop(self):
-    for pid in range(self.workers):
-      self.task_queue.put(self.STOP_TOKEN)
-    self.task_queue.join()
-
-  def worker(self, pid):
-    try:
-      import procname
-      procname.setprocname(self.name)
-    except ImportError:
-      pass
+  def startup(self):
     import dhmon
-    es = dhmon.ElasticsearchBackend()
-    es.connect()
-    cache = es.scan_paths()
-    logging.info('Started path saver thread %d', pid)
-    logging.info('Pre-warmed cache with %d entries', len(cache))
-    tree = dhmon.PathTree()
-    for task in iter(self.task_queue.get, self.STOP_TOKEN):
-      work = task - cache
-      if work:
-        for path in work:
-          tree.update(path.split('.'))
-        logging.info('Committing paths, %d values currently', len(cache))
-        es.add_path_tree(tree, skip=cache, callback=lambda x: cache.add(x))
-        tree = dhmon.PathTree()
-      self.task_queue.task_done()
+    self.es = dhmon.ElasticsearchBackend()
+    self.es.connect()
+    logging.info('Pre-warming path cache')
+    self.cache = self.es.scan_paths()
+    logging.info('Started path saver thread %d', self.pid)
+    logging.info('Pre-warmed cache with %d entries', len(self.cache))
 
-    self.task_queue.task_done()
-    logging.info('Terminating path saver thread %d', pid)
+  def do(self, task):
+    work = task - self.cache
+    if work:
+      tree = dhmon.PathTree()
+      for path in work:
+        tree.update(path.split('.'))
+      logging.info('Committing paths, %d values currently', len(self.cache))
+      es.add_path_tree(tree, skip=self.cache,
+          callback=lambda x: self.cache.add(x))
+
+  def shutdown(self):
+    logging.info('Terminating path saver thread %d', self.pid)

@@ -15,8 +15,8 @@ import supervisor
 import supervisor
 
 
-SNMP_WORKERS = 5
-RESULT_SAVERS = 1
+SNMP_WORKERS = 35
+RESULT_SAVERS = 5
 
 
 def main():

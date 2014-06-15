@@ -1,6 +1,7 @@
 import Queue
 import logging
 import multiprocessing as mp
+import stage
 import sqlite3
 import time
 import yaml
@@ -9,25 +10,19 @@ import snmp_target
 import config
 
 
-class Supervisor(object):
+class Supervisor(stage.Stage):
 
-  STOP_TOKEN = None
   TICK_TOKEN = 'TICK'
 
   def __init__(self):
     logging.info('Starting supervisor')
-    self.control_queue = mp.JoinableQueue(1024)
+    task_queue = mp.JoinableQueue(1024)
     self.work_queue = mp.JoinableQueue(1024*1024)
-    p = mp.Process(target=self.worker, args=())
-    p.start()
-
-  def stop(self):
-    self.control_queue.put(self.STOP_TOKEN)
-    self.control_queue.join()
+    super(Supervisor, self).__init__(task_queue, 'supervisor', workers=1)
 
   def tick(self, signum=None, frame=None):
     logging.debug('Received tick, starting new poll cycle')
-    self.control_queue.put(self.TICK_TOKEN)
+    self.task_queue.put(self.TICK_TOKEN)
 
   def _construct_targets(self, timestamp):
     db = sqlite3.connect('/etc/ipplan.db')
@@ -44,24 +39,16 @@ class Supervisor(object):
       nodes[host] = snmp_target.SnmpTarget(host, timestamp, **layer_config)
     return nodes
 
-  def _new_cycle(self):
-    timestamp = time.time()
-    for target in self._construct_targets(timestamp).values():
-      self.work_queue.put_nowait(target)
-    logging.info('New work pushed, length %d', self.work_queue.qsize())
-
-  def worker(self):
+  def startup(self):
     logging.info('Started supervisor')
-    running = True
-    for token in iter(self.control_queue.get, self.STOP_TOKEN):
-      if token == self.TICK_TOKEN:
-        self._new_cycle()
-      self.control_queue.task_done()
 
-    self.control_queue.task_done()
+  def do(self, token):
+    if token == self.TICK_TOKEN:
+      timestamp = time.time()
+      for target in self._construct_targets(timestamp).values():
+        self.work_queue.put_nowait(target)
+      logging.info('New work pushed, length %d', self.work_queue.qsize())
+
+  def shutdown(self):
     logging.info('Terminating supervisor')
-
-if __name__ == "__main__":
-  s = Supervisor()
-  print s._construct_targets()
 

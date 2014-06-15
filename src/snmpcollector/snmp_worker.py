@@ -1,31 +1,19 @@
 import logging
 import multiprocessing as mp
 import re
+import stage
 
 import config
 import snmp_target
 
 
-class SnmpWorker(object):
-
-  STOP_TOKEN = None
+class SnmpWorker(stage.Stage):
 
   def __init__(self, task_queue, workers):
     logging.info('Starting SNMP workers')
     self.model_oid_cache = {}
-    self.task_queue = task_queue
     self.result_queue = mp.JoinableQueue(1024*1024)
-    self.workers = workers
-    self.name = 'snmp_worker'
-    for pid in range(workers):
-      p = mp.Process(target=self.worker, args=(pid, ), name=self.name)
-      p.start()
-
-  def stop(self):
-    for pid in range(self.workers):
-      self.task_queue.put(self.STOP_TOKEN)
-    self.task_queue.join()
-
+    super(SnmpWorker, self).__init__(task_queue, 'snmp_worker', workers=workers)
 
   def _gather_oids(self, model):
     if model in self.model_oid_cache:
@@ -40,33 +28,27 @@ class SnmpWorker(object):
     self.model_oid_cache[model] = list(oids)
     return list(oids)
 
-  def worker(self, pid):
-    try:
-      import procname
-      procname.setprocname(self.name)
-    except ImportError:
-      pass
-    logging.info('Started SNMP worker thread %d', pid)
-    for task in iter(self.task_queue.get, self.STOP_TOKEN):
-      model = task.model()
-      if not model:
-        # TODO(bluecmd): Log this failure to a metric
-        logging.debug('Unable to collect from %s, cannot get model', task.host)
-        self.task_queue.task_done()
-        continue
+  def startup(self):
+    logging.info('Started SNMP worker thread %d', self.pid)
 
-      logging.debug('Object %s is model %s', task.host, model)
-      oids = self._gather_oids(model)
-      results = {}
-      for oid in oids:
-        logging.debug('Collecting %s on %s', oid, task.host)
-        results.update(task.walk(oid))
+  def do(self, task):
+    model = task.model()
+    if not model:
+      # TODO(bluecmd): Log this failure to a metric
+      logging.debug('Unable to collect from %s, cannot get model', task.host)
+      return
 
-      logging.debug('Done SNMP poll (%d objects) for "%s"',
-          len(results.keys()), task.host)
-      self.result_queue.put_nowait(snmp_target.SnmpResult(
-        target=task, results=results))
-      self.task_queue.task_done()
+    logging.debug('Object %s is model %s', task.host, model)
+    oids = self._gather_oids(model)
+    results = {}
+    for oid in oids:
+      logging.debug('Collecting %s on %s', oid, task.host)
+      results.update(task.walk(oid))
 
-    self.task_queue.task_done()
-    logging.info('Terminating SNMP worker thread %d', pid)
+    logging.debug('Done SNMP poll (%d objects) for "%s"',
+        len(results.keys()), task.host)
+    self.result_queue.put_nowait(snmp_target.SnmpResult(
+      target=task, results=results))
+
+  def shutdown(self):
+    logging.info('Terminating SNMP worker thread %d', self.pid)
