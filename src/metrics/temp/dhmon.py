@@ -22,13 +22,6 @@ class PathTree(object):
       return
     self.children[path[0]].update(path[1:])
 
-  def contains(self, path):
-    if not path:
-      return True
-    if path[0] not in self.children:
-      return False
-    return self.children[path[0]].contains(path[1:])
-
 
 class CassandraBackend(object):
 
@@ -44,14 +37,11 @@ class CassandraBackend(object):
     self.ops = []
     self.rollup = 30
     self.period = 86400
-    self.inserted_paths = 0
-    self.path_cache = PathTree()
     self.path_tree = PathTree()
     return True
 
   def queue(self, timestamp, path, value):
-    if not self.path_cache.contains(path):
-      self.path_tree.update(path.split('.'))
+    self.path_tree.update(path.split('.'))
     self.ops.append(self.session.execute_async(
       self.prepared_insert, ([value], self.rollup, self.period,
         path, timestamp)))
@@ -63,8 +53,6 @@ class CassandraBackend(object):
       self.es.index(index='cynaite_paths', doc_type='path', id=metric_path,
           body={'path': metric_path, 'tenant': '', 'leaf': leaf,
             'depth': len(prefix)})
-      self.path_cache.update(prefix)
-      self.inserted_paths += 1
 
     for k,v in path.children.iteritems():
       self._add_path_tree_to_es(prefix + [k], v)
