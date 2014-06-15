@@ -7,14 +7,16 @@ import signal
 import sys
 
 import config
+import path_saver
 import result_processor
 import result_saver
 import snmp_worker
 import supervisor
+import supervisor
 
 
-SNMP_WORKERS = 20
-RESULT_SAVERS = 3
+SNMP_WORKERS = 50
+RESULT_SAVERS = 6
 
 
 def main():
@@ -38,6 +40,8 @@ def main():
   _result_saver = result_saver.ResultSaver(
       _result_processor.result_queue, RESULT_SAVERS)
 
+  _path_saver = path_saver.PathSaver(_result_saver.path_queue)
+
   def stop(signum, frame):
     logging.info('Stopping supervisor')
     _supervisor.stop()
@@ -50,6 +54,9 @@ def main():
 
     logging.info('Stopping result saver')
     _result_saver.stop()
+
+    logging.info('Stopping path saver')
+    _path_saver.stop()
 
   signal.signal(signal.SIGALRM, _supervisor.tick)
   signal.signal(signal.SIGINT, stop)

@@ -11,7 +11,7 @@ class ResultSaver(object):
   def __init__(self, task_queue, workers):
     logging.info('Starting result savers')
     self.task_queue = task_queue
-    self.result_queue = mp.JoinableQueue()
+    self.path_queue = mp.JoinableQueue(1024*1024)
     self.workers = workers
     self.name = 'result_saver'
     for pid in range(workers):
@@ -30,7 +30,7 @@ class ResultSaver(object):
     except ImportError:
       pass
     import dhmon
-    dhmon.connect()
+    dhmon.connect(dhmon.CassandraBackend)
     logging.info('Started result saver thread %d', pid)
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
       timestamp = int(task.target.timestamp)
@@ -49,14 +49,16 @@ class ResultSaver(object):
           # TODO(bluecmd): Save this to redis
           ignored += 1
 
+      for metric in metrics:
+        self.path_queue.put_nowait(metric.path)
+
       try:
         dhmon.metricbulk(metrics)
       except IOError:
         logging.error('Failed to save metrics, ignoring this sample')
 
-      logging.info('Save completed for %d metrics (ignored %d, '
-        'inserted %d paths) for %s', saved, ignored,
-        dhmon.backend.inserted_paths, task.target.host)
+      logging.info('Save completed for %d metrics (ignored %d) for %s',
+          saved, ignored, task.target.host)
       self.task_queue.task_done()
 
     self.task_queue.task_done()

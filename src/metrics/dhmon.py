@@ -5,11 +5,16 @@ import sys
 import time
 
 
-BulkMetric = collections.namedtuple('BulkMetric', [
-  'timestamp', 'hostname', 'metric', 'value'])
-
-
 backend = None
+
+
+class BulkMetric(object):
+
+  def __init__(self, timestamp, hostname, metric, value):
+    rev_hostname = '.'.join(reversed(hostname.split('.')))
+    self.path = 'dh.%s.%s' % (rev_hostname, metric)
+    self.timestamp = timestamp
+    self.value = value
 
 
 class PathTree(object):
@@ -34,8 +39,6 @@ class CassandraBackend(object):
 
   def connect(self):
     import cassandra.cluster
-    import elasticsearch
-    self.es = elasticsearch.Elasticsearch('metricstore.event.dreamhack.se')
     self.cluster = cassandra.cluster.Cluster(['metricstore.event.dreamhack.se'])
     self.session = self.cluster.connect('metric')
     sql = ('UPDATE metric SET data = data + ? WHERE tenant = \'\' AND '
@@ -44,17 +47,28 @@ class CassandraBackend(object):
     self.ops = []
     self.rollup = 30
     self.period = 86400
-    self.inserted_paths = 0
-    self.path_cache = PathTree()
-    self.path_tree = PathTree()
     return True
 
   def queue(self, timestamp, path, value):
-    if not self.path_cache.contains(path):
-      self.path_tree.update(path.split('.'))
     self.ops.append(self.session.execute_async(
       self.prepared_insert, ([value], self.rollup, self.period,
         path, timestamp)))
+
+  def finish(self):
+    for op in self.ops:
+      op.result()
+    self.ops = []
+
+
+class CassandraEsBackend(CassandraBackend):
+
+  def connect(self):
+    import elasticsearch
+    self.es = elasticsearch.Elasticsearch('metricstore.event.dreamhack.se')
+    self.inserted_paths = 0
+    self.path_cache = PathTree()
+    self.path_tree = PathTree()
+    return super(CassandraEsBackend, self).connect()
 
   def _add_path_tree_to_es(self, prefix, path):
     if prefix:
@@ -69,13 +83,15 @@ class CassandraBackend(object):
     for k,v in path.children.iteritems():
       self._add_path_tree_to_es(prefix + [k], v)
 
-  def finish(self):
-    for op in self.ops:
-      op.result()
+  def queue(self, timestamp, path, value):
+    super(CassandraEsBackend, self).queue(timestamp, path, value)
+    if not self.path_cache.contains(path):
+      self.path_tree.update(path.split('.'))
 
+  def finish(self):
+    super(CassandraEsBackend, self).finish()
     self._add_path_tree_to_es([], self.path_tree)
     self.path_tree = PathTree()
-    self.ops = []
 
 
 class CarbonBackend(object):
@@ -97,7 +113,7 @@ class CarbonBackend(object):
     pass
 
 
-def connect(backend_cls=CassandraBackend):
+def connect(backend_cls=CassandraEsBackend):
   global backend
   backend = backend_cls()
   return backend.connect()
@@ -120,12 +136,10 @@ def metricbulk(values):
 
   ops = []
   for bulkmetric in values:
-    rev_hostname = '.'.join(reversed(bulkmetric.hostname.split('.')))
-    path = 'dh.%s.%s' % (rev_hostname, bulkmetric.metric)
     rollup = 30
     period = 86400
     timestamp = (int(bulkmetric.timestamp) / rollup) * rollup
-    backend.queue(timestamp, path, int(bulkmetric.value))
+    backend.queue(timestamp, bulkmetric.path, int(bulkmetric.value))
 
   backend.finish()
 
