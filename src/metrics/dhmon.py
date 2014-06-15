@@ -43,7 +43,7 @@ class ElasticsearchBackend(object):
     self.inserted_paths = 0
 
   def add_path(self, path, leaf, depth):
-    self.es.index(index='cynaite_paths', doc_type='path', id=path,
+    self.es.index(index='cyanite_paths', doc_type='path', id=path,
         body={'path': path, 'tenant': '', 'leaf': leaf, 'depth': depth})
     self.inserted_paths += 1
 
