@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import daemonize
 import logging
+import logging.handlers
 import multiprocessing as mp
 import os
 import signal
@@ -59,7 +59,13 @@ if __name__ == "__main__":
   root = logging.getLogger()
 
   root.addHandler(logging.handlers.SysLogHandler('/dev/log'))
-  root.setLevel(logging.DEBUG)
+  root.setLevel(logging.INFO)
+
+  tracer = logging.getLogger('elasticsearch.trace')
+  tracer.setLevel(logging.WARNING)
+  tracer = logging.getLogger('elasticsearch')
+  tracer.setLevel(logging.WARNING)
+
 
   if len(sys.argv) > 1 and sys.argv[1] == '-d':
     ch = logging.StreamHandler(sys.stdout)
@@ -73,6 +79,7 @@ if __name__ == "__main__":
     main()
   else:
     # TODO(bluecmd): Fix this
+    import daemonize
     daemon = daemonize.Daemonize(app='snmpcollector',
         pid='/var/run/dhmon/snmpcollector.pid', action=main)
     daemon.start()

@@ -19,8 +19,9 @@ class ResultProcessor(object):
     self.result_queue = mp.JoinableQueue(1024*1024)
     self.workers = workers
     self.counter_history = {}
+    self.name = 'result_processor'
     for pid in range(workers):
-      p = mp.Process(target=self.worker, args=(pid, ))
+      p = mp.Process(target=self.worker, args=(pid, ), name=self.name)
       p.start()
 
   def stop(self):
@@ -29,6 +30,11 @@ class ResultProcessor(object):
     self.task_queue.join()
 
   def worker(self, pid):
+    try:
+      import procname
+      procname.setprocname(self.name)
+    except ImportError:
+      pass
     logging.info('Started result processor thread %d', pid)
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
       #logging.debug('Processing result "%s"', task)
@@ -40,10 +46,10 @@ class ResultProcessor(object):
           old_value = result.value
           if path in self.counter_history:
             if self.counter_history[path] > int(result.value):
-              logging.warning('Wrap-around on %s on %s', oid, task.target.host)
+              # TODO(bluecmd): Handle wrap-arounds
+              pass
 
             new_value = int(result.value) - self.counter_history[path]
-            # TODO(bluecmd): Handle wrap-arounds
             result = snmp_target.ResultTuple(str(new_value), result.type)
           else:
             skip = True

@@ -48,7 +48,7 @@ class Supervisor(object):
     timestamp = time.time()
     for target in self._construct_targets(timestamp).values():
       self.work_queue.put_nowait(target)
-    logging.debug('New work pushed, length %d', self.work_queue.qsize())
+    logging.info('New work pushed, length %d', self.work_queue.qsize())
 
   def worker(self):
     logging.info('Started supervisor')

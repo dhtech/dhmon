@@ -16,8 +16,9 @@ class SnmpWorker(object):
     self.task_queue = task_queue
     self.result_queue = mp.JoinableQueue(1024*1024)
     self.workers = workers
+    self.name = 'snmp_worker'
     for pid in range(workers):
-      p = mp.Process(target=self.worker, args=(pid, ))
+      p = mp.Process(target=self.worker, args=(pid, ), name=self.name)
       p.start()
 
   def stop(self):
@@ -40,6 +41,11 @@ class SnmpWorker(object):
     return list(oids)
 
   def worker(self, pid):
+    try:
+      import procname
+      procname.setprocname(self.name)
+    except ImportError:
+      pass
     logging.info('Started SNMP worker thread %d', pid)
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
       model = task.model()
