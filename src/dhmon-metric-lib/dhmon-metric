@@ -4,7 +4,7 @@ import socket
 import sys
 import time
 
-if len(sys.argv) > 5:
+if len(sys.argv) > 5 or (len(sys.argv) > 1 and sys.argv[1] == '--help'):
   print "%s: [[timestamp] [hostname] metric value] | [timestamp]" % sys.argv[0]
   sys.exit(0)
 

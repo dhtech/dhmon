@@ -16,7 +16,7 @@ class ResultSaver(stage.Stage):
   def startup(self):
     import dhmon
     self.dhmon = dhmon
-    self.dhmon.connect(dhmon.CassandraBackend)
+    self.dhmon.connect()
     logging.info('Started result saver thread %d', self.pid)
 
   def do(self, task):

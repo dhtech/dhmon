@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 import logging
 import logging.handlers
 import multiprocessing as mp
@@ -6,18 +6,15 @@ import os
 import signal
 import sys
 
-import config
-import path_saver
-import result_processor
-import result_saver
-import snmp_worker
-import supervisor
-import supervisor
+from src import config
+from src import result_processor
+from src import result_saver
+from src import snmp_worker
+from src import supervisor
 
 
-SNMP_WORKERS = 35
-RESULT_SAVERS = 5
-
+# Global variable to keep track of if we have been interrupted more than once
+first_int = True
 
 def main():
   config.load('/etc/snmpcollector.yaml')
@@ -29,20 +26,21 @@ def main():
   _supervisor = supervisor.Supervisor()
 
   _snmp_worker = snmp_worker.SnmpWorker(
-      _supervisor.work_queue, SNMP_WORKERS)
-
-  #_result_saver = result_saver.ResultSaver(
-  #    _snmp_worker.result_queue, RESULT_SAVERS)
+      _supervisor.work_queue, int(config.config['snmp_workers']))
 
   _result_processor = result_processor.ResultProcessor(
       _snmp_worker.result_queue)
 
   _result_saver = result_saver.ResultSaver(
-      _result_processor.result_queue, RESULT_SAVERS)
-
-  _path_saver = path_saver.PathSaver(_result_saver.path_queue)
+      _result_processor.result_queue, int(config.config['result_savers']))
 
   def stop(signum, frame):
+    global first_int
+    if not first_int:
+      logging.info('Got INT twice, exiting without cleaning up')
+      sys.exit(1)
+
+    first_int = False
     logging.info('Stopping supervisor')
     _supervisor.stop()
 
@@ -55,9 +53,6 @@ def main():
     logging.info('Stopping result saver')
     _result_saver.stop()
 
-    logging.info('Stopping path saver')
-    _path_saver.stop()
-
   signal.signal(signal.SIGALRM, _supervisor.tick)
   signal.signal(signal.SIGINT, stop)
   signal.signal(signal.SIGTERM, stop)
@@ -68,13 +63,8 @@ if __name__ == "__main__":
   root.addHandler(logging.handlers.SysLogHandler('/dev/log'))
   root.setLevel(logging.INFO)
 
-  tracer = logging.getLogger('elasticsearch.trace')
-  tracer.setLevel(logging.WARNING)
-  tracer = logging.getLogger('elasticsearch')
-  tracer.setLevel(logging.WARNING)
-
-
   if len(sys.argv) > 1 and sys.argv[1] == '-d':
+    root.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.DEBUG)
     formatter = logging.Formatter( '%(asctime)s - %(name)s - '

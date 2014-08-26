@@ -1,0 +1,6 @@
+number_of_daemons: 1
+name: snmpcollector
+pid: /var/run/dhmon/snmpcollector.poker.pid
+period: 30000
+scripts:
+  - /srv/dhmon/src/snmpcollector/poke

@@ -30,7 +30,7 @@ class Supervisor(stage.Stage):
     sql = ("SELECT h.name, o.value FROM host h, option o WHERE o.name = 'layer'"
         "AND h.node_id = o.node_id")
     nodes = {}
-    for host, layer in cursor.execute( sql ).fetchall():
+    for host, layer in cursor.execute(sql).fetchall():
       layer_config = config.config['snmp'].get(layer, None)
       if layer_config is None:
         logging.error('Unable to target "%s" since layer "%s" is unknown',

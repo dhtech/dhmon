@@ -7,7 +7,9 @@ ResultTuple = collections.namedtuple('ResultTuple', ['value', 'type'])
 class SnmpTarget(object):
 
   def __init__(self, host, timestamp, version, community=None, user=None,
-      auth_proto=None, auth=None, priv_proto=None, priv=None, sec_level=None):
+      auth_proto=None, auth=None, priv_proto=None, priv=None, sec_level=None,
+      port=161):
+    self._full_host = "%s:%s" % (host, port)
     self.host=host
     self.timestamp=timestamp
     self.version=version
@@ -21,13 +23,13 @@ class SnmpTarget(object):
 
   def _snmp_session(self):
     if self.version == 3:
-      return netsnmp.Session(Version=3, DestHost=self.host,
+      return netsnmp.Session(Version=3, DestHost=self._full_host,
         SecName=self.user, SecLevel=self.sec_level,
         AuthProto=self.auth_proto, AuthPass=self.auth,
         PrivProto=self.priv_proto, PrivPass=self.priv,
         UseNumeric=1)
     else:
-      return netsnmp.Session(Version=self.version, DestHost=self.host,
+      return netsnmp.Session(Version=self.version, DestHost=self._full_host,
           Community=self.community, UseNumeric=1)
 
   def walk(self, oid):

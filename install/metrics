@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-pip install cassandra-driver elasticsearch daemonize 
+pip install daemonize 
 
 mkdir /var/run/dhmon
 chmod 777 /var/run/dhmon
