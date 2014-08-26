@@ -4,9 +4,11 @@ import time
 
 
 class MeasureToken(object):
-  def __init__(self):
+  def __init__(self, name, blocker=False):
     self._start = time.time()
     self._stop = None
+    self.name = name
+    self.blocker = blocker
     self.elapsed = None
 
   def stop(self):
@@ -43,7 +45,8 @@ class Stage(object):
     pass
 
   def measure(self, token):
-    self.result_queue.join()
+    if token.blocker:
+      self.result_queue.join()
     self.result_queue.put_nowait(token)
 
   def worker(self, pid):

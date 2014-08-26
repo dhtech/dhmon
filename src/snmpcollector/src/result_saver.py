@@ -21,7 +21,7 @@ class ResultSaver(stage.Stage):
 
   def measure(self, token):
     token.stop()
-    self.dhmon.metric(metric='snmpcollector.runtime.us',
+    self.dhmon.metric(metric='snmpcollector.%s.us' % token.name,
         value=token.elapsed * 1000 * 1000)
 
   def do(self, task):

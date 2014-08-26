@@ -22,7 +22,7 @@ class Supervisor(stage.Stage):
 
   def tick(self, signum=None, frame=None):
     logging.debug('Received tick, starting new poll cycle')
-    self.task_queue.put(self.TICK_TOKEN)
+    self.task_queue.put_nowait(self.TICK_TOKEN)
 
   def _construct_targets(self, timestamp):
     db = sqlite3.connect('/etc/ipplan.db')
@@ -45,11 +45,13 @@ class Supervisor(stage.Stage):
   def do(self, token):
     if token == self.TICK_TOKEN:
       timestamp = time.time()
-      measure = stage.MeasureToken()
+      measure_runtime = stage.MeasureToken(name="runtime", blocker=True)
+      measure_congestion = stage.MeasureToken(name="congestion", blocker=False)
       for target in self._construct_targets(timestamp).values():
         self.result_queue.put_nowait(target)
+      self.result_queue.put_nowait(measure_congestion)
       self.result_queue.join()
-      self.result_queue.put_nowait(measure)
+      self.result_queue.put_nowait(measure_runtime)
       logging.info('New work pushed, length %d', self.result_queue.qsize())
 
   def shutdown(self):
