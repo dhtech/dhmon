@@ -1,38 +1,54 @@
-import multiprocessing as mp
-import logging
 import Queue
+import logging
+import multiprocessing as mp
+import stage
+import sqlite3
+import time
+import yaml
+
+import snmp_target
+import config
 
 
-class Supervisor(object):
+class Supervisor(stage.Stage):
 
-  STOP_TOKEN = None
   TICK_TOKEN = 'TICK'
 
   def __init__(self):
     logging.info('Starting supervisor')
-    self.control_queue = mp.JoinableQueue()
-    self.work_queue = mp.JoinableQueue()
-    p = mp.Process(target=self.worker, args=())
-    p.start()
+    task_queue = mp.JoinableQueue(1024)
+    self.work_queue = mp.JoinableQueue(1024*1024)
+    super(Supervisor, self).__init__(task_queue, 'supervisor', workers=1)
 
-  def stop(self):
-    self.control_queue.put(self.STOP_TOKEN)
-    self.control_queue.join()
-
-  def tick(self):
+  def tick(self, signum=None, frame=None):
     logging.debug('Received tick, starting new poll cycle')
-    self.control_queue.put(TICK_TOKEN)
+    self.task_queue.put(self.TICK_TOKEN)
 
-  def _new_cycle(self):
-    self.work_queue.put('Hej SG')
-    logging.info('New work pushed, length %d', self.work_queue.qsize())
+  def _construct_targets(self, timestamp):
+    db = sqlite3.connect('/etc/ipplan.db')
+    cursor = db.cursor()
+    sql = ("SELECT h.name, o.value FROM host h, option o WHERE o.name = 'layer'"
+        "AND h.node_id = o.node_id")
+    nodes = {}
+    for host, layer in cursor.execute( sql ).fetchall():
+      layer_config = config.config['snmp'].get(layer, None)
+      if layer_config is None:
+        logging.error('Unable to target "%s" since layer "%s" is unknown',
+            host, layer)
+        continue
+      nodes[host] = snmp_target.SnmpTarget(host, timestamp, **layer_config)
+    return nodes
 
-  def worker(self):
+  def startup(self):
     logging.info('Started supervisor')
-    running = True
-    for token in iter(self.control_queue.get, self.STOP_TOKEN):
-      if token == self.TICK_TOKEN:
-        self._new_cycle()
 
-    self.control_queue.task_done()
+  def do(self, token):
+    if token == self.TICK_TOKEN:
+      timestamp = time.time()
+      for target in self._construct_targets(timestamp).values():
+        self.work_queue.put_nowait(target)
+      logging.info('New work pushed, length %d', self.work_queue.qsize())
+
+  def shutdown(self):
     logging.info('Terminating supervisor')
+

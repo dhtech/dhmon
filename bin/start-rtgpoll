@@ -1,5 +1,0 @@
-#!/bin/bash -e
-
-cd $(dirname $0)/../src/rtg-targets/
-exec python rtg-targets.py $* \
-  | rtgpoll -d -c /etc/rtg/rtg.mock.conf -t /dev/stdin -v -Z

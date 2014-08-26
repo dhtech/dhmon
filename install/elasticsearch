@@ -1,0 +1,28 @@
+#!/bin/bash -xe
+
+IP=$(sqlite3 /etc/ipplan.db \
+  "SELECT ipv4_addr_txt FROM host WHERE name = '$(hostname -f)'")
+
+cd $(dirname $0)
+
+cat << EOF > /etc/apt/sources.list.d/elasticsearch.list
+deb http://packages.elasticsearch.org/elasticsearch/1.0/debian stable main
+EOF
+
+cat data/elasticsearch-apt.pub | apt-key add -
+apt-get update
+
+apt-get install -y elasticsearch openjdk-7-jre-headless
+
+cat << EOF > /etc/elasticsearch/elasticsearch.yml
+cluster.name: dhmon-es
+discovery.zen.ping.multicast.enabled: false
+discovery.zen.ping.unicast.hosts: ["metricstore.event.dreamhack.se" ]
+network.bind_host: 0.0.0.0
+network.publish_host: $IP
+EOF
+
+echo 'RESTART_ON_UPGRADE=true' > /etc/default/elasticsearch
+update-rc.d elasticsearch defaults 95 10
+
+service elasticsearch start

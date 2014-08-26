@@ -1,0 +1,8 @@
+#!/bin/bash -e
+
+pip install cassandra-driver elasticsearch daemonize 
+
+mkdir /var/run/dhmon
+chmod 777 /var/run/dhmon
+
+ln -sf /home/tech/bluecmd/dhmon/ /srv/
