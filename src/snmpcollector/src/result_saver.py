@@ -1,6 +1,7 @@
 import logging
 import multiprocessing as mp
 import stage
+import time
 
 
 class ResultSaver(stage.Stage):
@@ -9,7 +10,6 @@ class ResultSaver(stage.Stage):
 
   def __init__(self, task_queue, workers):
     logging.info('Starting result savers')
-    self.path_queue = mp.JoinableQueue(1024*1024)
     super(ResultSaver, self).__init__(task_queue, 'result_saver',
         workers=workers)
 
@@ -19,6 +19,11 @@ class ResultSaver(stage.Stage):
     self.dhmon.connect()
     logging.info('Started result saver thread %d', self.pid)
 
+  def measure(self, token):
+    token.stop()
+    self.dhmon.metric(metric='snmpcollector.runtime.us',
+        value=token.elapsed * 1000 * 1000)
+
   def do(self, task):
     timestamp = int(task.target.timestamp)
     metrics = []
@@ -26,6 +31,13 @@ class ResultSaver(stage.Stage):
     saved = 0
     ignored = 0
     for oid, result in task.results.iteritems():
+      # Record some stats on how long time it took to get this metric
+      elapsed = (time.time() - task.target.timestamp) * 1000 * 1000
+      bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
+          hostname=task.target.host, metric='snmp.elapsed.us%s' % oid,
+          value=elapsed)
+      metrics.append(bulkmetric)
+
       if result.type in self.INTEGER_TYPES:
         bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
             hostname=task.target.host, metric='snmp%s' % oid,
@@ -33,10 +45,18 @@ class ResultSaver(stage.Stage):
         metrics.append(bulkmetric)
         saved += 1
       else:
-        # TODO(bluecmd): Save this to redis
         ignored += 1
+        # TODO(bluecmd): Save this value to redis instead of ignoring it
 
-    self.path_queue.put_nowait(set([metric.path for metric in metrics]))
+    # Save collection stats
+    bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
+        hostname=task.target.host, metric='snmp.metrics.saved',
+        value=saved)
+    metrics.append(bulkmetric)
+    bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
+        hostname=task.target.host, metric='snmp.metrics.ignored',
+        value=ignored)
+    metrics.append(bulkmetric)
 
     try:
       self.dhmon.metricbulk(metrics)

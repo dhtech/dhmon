@@ -12,8 +12,8 @@ class SnmpWorker(stage.Stage):
   def __init__(self, task_queue, workers):
     logging.info('Starting SNMP workers')
     self.model_oid_cache = {}
-    self.result_queue = mp.JoinableQueue(1024*1024)
-    super(SnmpWorker, self).__init__(task_queue, 'snmp_worker', workers=workers)
+    super(SnmpWorker, self).__init__(task_queue, 'snmp_worker',
+        workers=workers, result_queue=mp.JoinableQueue(1024*1024))
 
   def _gather_oids(self, model):
     if model in self.model_oid_cache:

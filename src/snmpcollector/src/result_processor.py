@@ -11,10 +11,9 @@ class ResultProcessor(stage.Stage):
 
   def __init__(self, task_queue):
     logging.info('Starting result processor')
-    self.result_queue = mp.JoinableQueue(1024*1024)
     self.counter_history = {}
     super(ResultProcessor, self).__init__(task_queue, 'result_processor',
-        workers=1)
+        workers=1, result_queue=mp.JoinableQueue(1024*1024))
 
   def startup(self):
     logging.info('Started result processor thread %d', self.pid)
@@ -27,11 +26,19 @@ class ResultProcessor(stage.Stage):
         path = (task.target.host, oid)
         old_value = result.value
         if path in self.counter_history:
-          if self.counter_history[path] > int(result.value):
-            # TODO(bluecmd): Handle wrap-arounds
-            pass
-
+          # Default to delta for counter values
           new_value = int(result.value) - self.counter_history[path]
+
+          # Check for wrap-around
+          if self.counter_history[path] > int(result.value):
+            intmax = 0
+            if result.type == 'COUNTER64':
+              intmax = pow(2, 64)
+            else:
+              intmax = pow(2, 32)
+            new_value = int(result.value) + intmax - self.counter_history[path]
+
+          # Create new result tuple
           result = snmp_target.ResultTuple(str(new_value), result.type)
         else:
           skip = True

@@ -17,8 +17,8 @@ class Supervisor(stage.Stage):
   def __init__(self):
     logging.info('Starting supervisor')
     task_queue = mp.JoinableQueue(1024)
-    self.work_queue = mp.JoinableQueue(1024*1024)
-    super(Supervisor, self).__init__(task_queue, 'supervisor', workers=1)
+    super(Supervisor, self).__init__(task_queue, 'supervisor', workers=1,
+        result_queue=mp.JoinableQueue(1024*1024))
 
   def tick(self, signum=None, frame=None):
     logging.debug('Received tick, starting new poll cycle')
@@ -45,9 +45,12 @@ class Supervisor(stage.Stage):
   def do(self, token):
     if token == self.TICK_TOKEN:
       timestamp = time.time()
+      measure = stage.MeasureToken()
       for target in self._construct_targets(timestamp).values():
-        self.work_queue.put_nowait(target)
-      logging.info('New work pushed, length %d', self.work_queue.qsize())
+        self.result_queue.put_nowait(target)
+      self.result_queue.join()
+      self.result_queue.put_nowait(measure)
+      logging.info('New work pushed, length %d', self.result_queue.qsize())
 
   def shutdown(self):
     logging.info('Terminating supervisor')

@@ -1,15 +1,29 @@
 import logging
 import multiprocessing as mp
+import time
+
+
+class MeasureToken(object):
+  def __init__(self):
+    self._start = time.time()
+    self._stop = None
+    self.elapsed = None
+
+  def stop(self):
+    self._stop = time.time()
+    self.elapsed = self._stop - self._start
 
 
 class Stage(object):
 
   STOP_TOKEN = None
 
-  def __init__(self, task_queue, name, workers):
+  def __init__(self, task_queue, name, workers, result_queue=None):
     self.task_queue = task_queue
     self.workers = workers
     self.name = name
+    if result_queue:
+      self.result_queue = result_queue
     for pid in range(workers):
       p = mp.Process(target=self.worker, args=(pid, ), name=self.name)
       p.start()
@@ -28,6 +42,10 @@ class Stage(object):
   def do(self, task):
     pass
 
+  def measure(self, token):
+    self.result_queue.join()
+    self.result_queue.put_nowait(token)
+
   def worker(self, pid):
     try:
       import procname
@@ -38,7 +56,10 @@ class Stage(object):
     self.pid = pid
     self.startup()
     for task in iter(self.task_queue.get, self.STOP_TOKEN):
-      self.do(task)
+      if isinstance(task, MeasureToken):
+        self.measure(task)
+      else:
+        self.do(task)
       self.task_queue.task_done()
 
     self.task_queue.task_done()

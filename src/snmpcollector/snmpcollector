@@ -26,7 +26,7 @@ def main():
   _supervisor = supervisor.Supervisor()
 
   _snmp_worker = snmp_worker.SnmpWorker(
-      _supervisor.work_queue, int(config.config['snmp_workers']))
+      _supervisor.result_queue, int(config.config['snmp_workers']))
 
   _result_processor = result_processor.ResultProcessor(
       _snmp_worker.result_queue)
