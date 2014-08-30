@@ -1,7 +1,14 @@
 #!/bin/bash -xe
 
-IP=$(sqlite3 /etc/ipplan.db \
+IP_DEFAULT=$(sqlite3 /etc/ipplan.db \
   "SELECT ipv4_addr_txt FROM host WHERE name = '$(hostname -f)'")
+IP=${IP-${IP_DEFAULT}}
+
+if [ -z "$IP" ]; then
+  echo "error: could not determine assigned IP"
+  exit 1
+fi
+echo "Using IP $IP"
 
 cd $(dirname $0)
 

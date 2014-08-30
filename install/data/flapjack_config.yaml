@@ -1,0 +1,72 @@
+production:
+  pid_dir: /var/run/flapjack/
+  log_dir: /var/log/flapjack/
+  daemonize: yes
+  logger:
+    level: INFO
+    syslog_errors: yes
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+  processor:
+    enabled: yes
+    queue: events
+    notifier_queue: notifications
+    archive_events: true
+    events_archive_maxage: 10800
+    new_check_scheduled_maintenance_duration: 15 min
+    new_check_scheduled_maintenance_ignore_tags:
+      - bypass_ncsm
+    logger:
+      level: INFO
+      syslog_errors: yes
+  notifier:
+    enabled: yes
+    queue: notifications
+    email_queue: email_notifications
+    udp_queue: udp_notifications
+    notification_log_file: /var/log/flapjack/notification.log
+    default_contact_timezone: UTC
+    logger:
+      level: INFO
+      syslog_errors: yes
+  gateways:
+    email:
+      enabled: yes
+      queue: email_notifications
+      logger:
+        level: INFO
+        syslog_errors: yes
+      smtp_config:
+        from: "Dreamhack Monitoring <dhmon@XXXX>"
+        reply_to: "XXXX@YYYYY"
+        host: 127.0.0.1
+        port: 25
+        starttls: false
+    udp:
+      enabled: yes
+      queue: udp_notifications
+      logger:
+        level: INFO
+        syslog_errors: yes
+      template: "/etc/flapjack/udp_template.text.erb"
+    web:
+      enabled: yes
+      port: 3080
+      timeout: 300
+      access_log: "/var/log/flapjack/web_access.log"
+      api_url: "/flapjack-api/"
+      base_url: "/flapjack/"
+      logger:
+        level: INFO
+        syslog_errors: yes
+    jsonapi:
+      enabled: yes
+      port: 3081
+      timeout: 300
+      access_log: "/var/log/flapjack/jsonapi_access.log"
+      base_url: "/flapjack-api/"
+      logger:
+        level: INFO
+        syslog_errors: yes
