@@ -1,3 +1,0 @@
-./configure --prefix=/usr --with-snmp=/usr --with-mysql=/usr MYSQL_LIB_DIR=/usr/lib/i386-linux-gnu/ LDFLAGS='-lzmq' CFLAGS=-O3
-make
-sudo cp src/rtgpoll /usr/bin/
