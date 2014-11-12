@@ -38,6 +38,11 @@ def main():
       _result_processor.result_queue, int(config.config['result_savers']))
 
   running = True
+
+  with open(sys.argv[1], 'w') as pidfile:
+    pidfile.write(str(os.getpid()))
+    pidfile.close()
+
   def stop(signum, frame):
     global first_int
     global running
@@ -80,12 +85,8 @@ if __name__ == "__main__":
         '%(levelname)s - %(message)s' )
     ch.setFormatter(formatter)
     root.addHandler(ch)
-    with open('/var/run/dhmon/snmpcollector.pid', 'w') as pidfile:
-      pidfile.write(str(os.getpid()))
     main()
   else:
-    # TODO(bluecmd): Fix this
-    import daemonize
-    daemon = daemonize.Daemonize(app='snmpcollector',
-        pid='/var/run/dhmon/snmpcollector.pid', action=main)
-    daemon.start()
+    import daemon
+    with daemon.DaemonContext():
+      main()

@@ -11,6 +11,7 @@ do
 done | sort -k 2 | uniq -f 1 | sort -n)
 
 TIMESTAMP=$(date +'%s') 
+echo "TIMESTAMP=$TIMESTAMP"
 for line in $LATEST
 do
   LAST=$(echo $line | awk '{print $1}')
@@ -26,5 +27,5 @@ do
   else
     HOST=$(echo $HOST | awk '{print $1}')
   fi
-  dhmon-metric "$TIMESTAMP" "$HOST" "tacacs.last-login" "$(($TIMESTAMP - $LAST)) * 1000"
-done
+  echo "$HOST|tacacs.last-login|$(($TIMESTAMP - $LAST)) * 1000"
+done | dhmon-metric $TIMESTAMP

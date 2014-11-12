@@ -1,6 +1,5 @@
 number_of_daemons: 1
 name: pinger
-pid: /var/run/dhmon/pinger.pid
-period: 30000
+period: 10000
 scripts:
-  - /srv/dhmon/src/metrics/ipplan-pinger
+  - /srv/dhmon/src/metrics/ipplan-pinger | /usr/local/bin/dhmon-metric

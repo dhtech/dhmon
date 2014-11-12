@@ -1,0 +1,5 @@
+# Defaults for dhmon
+
+LAUNCHER="pinger"
+
+SNMPCOLLECTOR="yes"

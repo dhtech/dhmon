@@ -38,6 +38,9 @@ if len(args) == 2:
 else:
   # Read metrics from stdin
   for line in sys.stdin:
+    if line.startswith('TIMESTAMP'):
+      timestamp = int(line.split('=')[1])
+      continue
     split = line.split('|')
     if len(split) == 3:
       hostname, metric, value = split
