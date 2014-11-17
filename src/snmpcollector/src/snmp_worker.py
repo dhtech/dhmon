@@ -7,6 +7,16 @@ import config
 import snmp_target
 
 
+class SnmpWalkAction(stage.Action):
+  """Walk over a given device."""
+
+  def __init__(self, target):
+    self.target = target
+
+  def do(self, stage):
+    stage.do_snmp_walk(self.target)
+
+
 class SnmpWorker(stage.Stage):
 
   def __init__(self, task_queue, workers):
