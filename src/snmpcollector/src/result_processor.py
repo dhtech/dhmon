@@ -1,53 +1,65 @@
+#!/usr/bin/env python2
 import logging
-import multiprocessing as mp
+
+import result_saver
+import snmp_target
 import stage
 
-import snmp_target
+
+class ProcessAction(stage.Action):
+  """Process a raw SNMP walk result set.
+
+  This will calculate deltas and other nice stuff that makes the
+  data generally much more manageable."""
+
+  def __init__(self, target, results):
+    self.target = target
+    self.results = results
+
+  def do(self, stage):
+    return stage.do_process(self.target, self.results)
 
 
 # TODO(bluecmd): This stage is not designed to run with multiple
 # instances, but is perpared to be modified to allowed that.
 class ResultProcessor(stage.Stage):
 
-  def __init__(self, task_queue):
-    logging.info('Starting result processor')
+  def __init__(self):
     self.counter_history = {}
-    super(ResultProcessor, self).__init__(task_queue, 'result_processor',
-        workers=1, result_queue=mp.JoinableQueue(1024*1024))
+    super(ResultProcessor, self).__init__(
+        'result_processor', task_queue='worker', result_queue='processed')
 
-  def startup(self):
-    logging.info('Started result processor thread %d', self.pid)
-
-  def do(self, task):
+  def do_process(self, target, results):
     filtered_results = {}
-    for oid, result in task.results.iteritems():
+    for oid, entry in results.iteritems():
       skip = False
-      if result.type == 'COUNTER64' or result.type == 'COUNTER':
-        path = (task.target.host, oid)
-        old_value = result.value
+      if entry.type == 'COUNTER64' or entry.type == 'COUNTER':
+        path = (target.host, oid)
+        old_value = entry.value
         if path in self.counter_history:
           # Default to delta for counter values
-          new_value = int(result.value) - self.counter_history[path]
+          new_value = int(entry.value) - self.counter_history[path]
 
           # Check for wrap-around
-          if self.counter_history[path] > int(result.value):
+          if self.counter_history[path] > int(entry.value):
             intmax = 0
-            if result.type == 'COUNTER64':
+            if entry.type == 'COUNTER64':
               intmax = pow(2, 64)
             else:
               intmax = pow(2, 32)
-            new_value = int(result.value) + intmax - self.counter_history[path]
+            new_value = int(entry.value) + intmax - self.counter_history[path]
 
           # Create new result tuple
-          result = snmp_target.ResultTuple(str(new_value), result.type)
+          entry = snmp_target.ResultTuple(str(new_value), entry.type)
         else:
           skip = True
         self.counter_history[path] = int(old_value)
       if not skip:
-        filtered_results[oid] = result
+        filtered_results[oid] = entry
 
-    self.result_queue.put_nowait(snmp_target.SnmpResult(
-      task.target, filtered_results))
+    yield result_saver.SaveAction(target, filtered_results)
 
-  def shutdown(self):
-    logging.info('Terminating result processor thread %d', self.pid)
+
+if __name__ == '__main__':
+  stage = ResultProcessor()
+  stage.run()

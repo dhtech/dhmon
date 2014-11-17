@@ -11,4 +11,5 @@ class Trigger(stage.Stage):
 
 if __name__ == '__main__':
   stage = Trigger()
+  stage.startup()
   stage.push(supervisor.TriggerAction())

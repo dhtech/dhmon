@@ -30,21 +30,20 @@ class Stage(object):
   stage (class instance) as a parameter.
   """
 
-  def __init__(self, name, task_queue=None, result_queue=None, mq='localhost'):
+  def __init__(self, name, task_queue=None, result_queue=None):
     self.name = name
     self.task_queue = 'dhmon:%s' % task_queue if task_queue else None
     self.result_queue = 'dhmon:%s' % result_queue if result_queue else None
-    self.mq = mq
     self.task_channel = None
     self.result_channel = None
-
-    self.connection = pika.BlockingConnection(
-        pika.ConnectionParameters(self.mq))
-    if result_queue:
-      self.result_channel = self.connection.channel()
+    self.connection = None
 
   def startup(self):
     config.load('/etc/snmpcollector.yaml')
+    self.connection = pika.BlockingConnection(
+        pika.ConnectionParameters(config.config['mq']))
+    if self.result_queue:
+      self.result_channel = self.connection.channel()
     logging.info('Started %s', self.name)
 
   def shutdown(self):
@@ -66,7 +65,8 @@ class Stage(object):
       return
 
     # Buffer up on all outgoing actions to ack only when we're done
-    actions = list(action.do(self))
+    action_generator = action.do(self)
+    actions = list(action_generator) if action_generator else []
 
     # Ack now, if we die during sending we will hopefully not crash loop
     channel.basic_ack(delivery_tag=method.delivery_tag)
@@ -80,7 +80,7 @@ class Stage(object):
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--debug', dest='debug', action='store_const', const=True,
+        '-d', '--debug', dest='debug', action='store_const', const=True,
         default=False, help='do not fork, print output to console')
     parser.add_argument('pidfile', help='pidfile to write')
     args = parser.parse_args()
@@ -116,14 +116,16 @@ class Stage(object):
     with open(pidfile, 'w') as f:
       f.write(str(os.getpid()))
 
+    self.startup()
+
     self.task_channel = self.connection.channel()
     self.task_channel.queue_declare(queue=self.task_queue)
+    self.task_channel.basic_qos(prefetch_count=1)
 
     if purge_task_queue:
       self.task_channel.queue_purge(queue=self.task_queue)
 
     self.task_channel.basic_consume(self._task_callback, queue=self.task_queue)
-    self.startup()
     try:
       self.task_channel.start_consuming()
     except KeyboardInterrupt:

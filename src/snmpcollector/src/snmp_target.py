@@ -1,8 +1,9 @@
 import collections
 import netsnmp
 
-SnmpResult = collections.namedtuple('SnmpResult', ['target', 'results'])
+
 ResultTuple = collections.namedtuple('ResultTuple', ['value', 'type'])
+
 
 class SnmpTarget(object):
 

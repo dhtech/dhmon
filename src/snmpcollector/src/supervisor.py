@@ -12,7 +12,7 @@ import stage
 class TriggerAction(stage.Action):
 
   def do(self, stage):
-    return stage.do_trigger(self)
+    return stage.do_trigger()
 
 
 class Supervisor(stage.Stage):
@@ -35,7 +35,7 @@ class Supervisor(stage.Stage):
         continue
       yield host, snmp_target.SnmpTarget(host, timestamp, **layer_config)
 
-  def do_trigger(self, action):
+  def do_trigger(self):
     timestamp = time.time()
     # TODO: reinvent this
     #measure_runtime = stage.MeasureToken(name="runtime", blocker=True)
