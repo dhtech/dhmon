@@ -10,6 +10,7 @@
 #include <netinet/ip_icmp.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <zmq.h>
 
 /* The ICMP checksum is calculated statically and just set as a constant. */
 #define PINGER_ICMP_CHKSUM 0xf7ff
@@ -27,7 +28,47 @@ typedef struct __attribute__ ((__packed__)) {
   } payload;
 } icmp_t;
 
+typedef struct __attribute__ ((__packed__)) {
+  char ip[16];
+  uint32_t secs;
+  uint32_t usecs;
+} zmq_response_t;
+
 uint16_t in_cksum(void *ptr, size_t len);
+
+
+int read_address_from_zmq(void *zmqfd, struct in_addr *addr) {
+  char buffer[16];
+  int size = zmq_recv(zmqfd, buffer, 15, 0);
+  if (size == -1) {
+    fprintf(stderr, "zmq_recv failed\n");
+    return -1;
+  }
+
+  buffer[size] = 0;
+  if (inet_pton(AF_INET, buffer, addr) != 1)
+    return -1;
+
+  printf("Read address %s\n", buffer);
+  return 0;
+}
+
+
+void publish_ping_result(void *zmqfd, struct in_addr *addr,
+                         int secs, int usecs) {
+  zmq_response_t response;
+
+  memset(&response, 0, sizeof(response));
+  if (inet_ntop(AF_INET, addr, response.ip, sizeof(response.ip)) == NULL) {
+    perror("inet_ntop");
+    return;
+  }
+  response.secs = secs;
+  response.usecs = usecs;
+
+  zmq_send(zmqfd, &response, sizeof(response), ZMQ_NOBLOCK);
+  printf("Published result for %s\n", response.ip);
+}
 
 
 void xmit_thread(int sockfd) {
@@ -35,6 +76,8 @@ void xmit_thread(int sockfd) {
   struct sockaddr_in targetaddr;
   struct timeval timestamp;
   size_t sent;
+  void *zmq_context;
+  void *zmqfd;
 
   memset(&packet, 0, sizeof(packet));
   memset(&targetaddr, 0, sizeof(targetaddr));
@@ -49,9 +92,21 @@ void xmit_thread(int sockfd) {
   packet.icmp.checksum = htons(PINGER_ICMP_CHKSUM);
   packet.payload.magic = htonl(PINGER_MAGIC);
 
+  /* set up ZMQ */
+  zmq_context = zmq_ctx_new();
+  zmqfd = zmq_socket(zmq_context, ZMQ_SUB);
+  if (zmq_setsockopt(zmqfd, ZMQ_SUBSCRIBE, "", 0)) {
+    perror("zmq_setsockopt");
+    return;
+  }
+  zmq_bind(zmqfd, "tcp://*:5560");
+
   for(;;) {
+    /* block here and wait for the address to send to */
+    if (read_address_from_zmq(zmqfd, &targetaddr.sin_addr))
+      continue;
+
     targetaddr.sin_family = AF_INET;
-    targetaddr.sin_addr.s_addr = inet_addr("10.255.253.1");
     packet.ip.daddr = targetaddr.sin_addr.s_addr;
 
     /* payload is magic + sent timestamp */
@@ -70,13 +125,13 @@ void xmit_thread(int sockfd) {
         (struct sockaddr*) &targetaddr, sizeof(targetaddr));
     if (sent < 0) {
       perror("sendto");
-    } else {
-      printf("Sent %lu bytes\n", sent);
+      continue;
     }
-
-    sleep(1);
   }
+
+  zmq_ctx_destroy(zmq_context);
 }
+
 
 void recv_thread(int sockfd) {
   icmp_t packet;
@@ -86,9 +141,16 @@ void recv_thread(int sockfd) {
   struct sockaddr_in from_addr;
   struct timeval *stamp;
   void *control;
+  void *zmq_context;
+  void *zmqfd;
   int res;
 
   control = malloc(PINGER_CONTROL_SIZE);
+
+  /* set up ZMQ */
+  zmq_context = zmq_ctx_new();
+  zmqfd = zmq_socket(zmq_context, ZMQ_PUB);
+  zmq_bind(zmqfd, "tcp://*:5561");
 
   for(;;) {
     int secs;
@@ -139,12 +201,20 @@ void recv_thread(int sockfd) {
       usecs = (1000000 + stamp->tv_usec) - packet.payload.tv_usec;
     }
 
-    printf("Ping response in %f\n", (float)secs * 1000.0 + (float)usecs / 1000.0);
+    publish_ping_result(zmqfd, &from_addr.sin_addr, secs, usecs);
   }
+
+  zmq_ctx_destroy(zmq_context);
   free(control);
 }
 
+
 int main(int argc, char *argv[]) {
+#ifdef DISPLAY_ZMQ_VERSION
+  int zmq_major = 0;
+  int zmq_minor = 0;
+  int zmq_patch = 0;
+#endif
   int enable = 1;
   int sockfd;
 
@@ -154,8 +224,14 @@ int main(int argc, char *argv[]) {
  }
 
   /* drop to nobody */
-  setgid(65534);
-  setuid(65534);
+  if (setgid(65534) < 0) {
+    perror("setgid");
+    return -1;
+  }
+  if (setuid(65534) < 0) {
+    perror("setuid");
+    return -1;
+  }
 
   if (setsockopt(
         sockfd, SOL_SOCKET, SO_TIMESTAMP, &enable, sizeof(enable)) < 0) {
@@ -168,6 +244,11 @@ int main(int argc, char *argv[]) {
     perror("setsockopt");
     return -1;
   }
+
+#ifdef DISPLAY_ZMQ_VERSION
+  zmq_version(&zmq_major, &zmq_minor, &zmq_patch);
+  printf("ZMQ %d.%d.%d version in use\n", zmq_major, zmq_minor, zmq_patch);
+#endif
 
   if (fork() == 0) {
     xmit_thread(sockfd);
