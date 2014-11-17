@@ -14,9 +14,9 @@ sender.connect('tcp://localhost:5560')
 # Give the subscriber some time to subscribe
 time.sleep(0.1)
 
-while True:
-  sender.send(sys.argv[1], zmq.NOBLOCK)
+sender.send(sys.argv[1], zmq.NOBLOCK)
 
+while True:
   ip, secs, usecs = struct.unpack('16sII', receiver.recv())
   print 'Reply:', ip, (secs*1000.0 + usecs / 1000.0)
 

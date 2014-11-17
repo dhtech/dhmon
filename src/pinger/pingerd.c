@@ -7,10 +7,10 @@
 #include <string.h>
 #include <sys/time.h>
 #include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <zmq.h>
+#include <linux/icmp.h>
 
 /* The ICMP checksum is calculated statically and just set as a constant. */
 #define PINGER_ICMP_CHKSUM 0xf7ff
@@ -49,7 +49,6 @@ int read_address_from_zmq(void *zmqfd, struct in_addr *addr) {
   if (inet_pton(AF_INET, buffer, addr) != 1)
     return -1;
 
-  printf("Read address %s\n", buffer);
   return 0;
 }
 
@@ -66,7 +65,7 @@ void publish_ping_result(void *zmqfd, struct in_addr *addr,
   response.secs = secs;
   response.usecs = usecs;
 
-  zmq_send(zmqfd, &response, sizeof(response), ZMQ_NOBLOCK);
+  zmq_send(zmqfd, &response, sizeof(response), ZMQ_DONTWAIT);
   printf("Published result for %s\n", response.ip);
 }
 
@@ -210,6 +209,7 @@ void recv_thread(int sockfd) {
 
 
 int main(int argc, char *argv[]) {
+  struct icmp_filter filt;
 #ifdef DISPLAY_ZMQ_VERSION
   int zmq_major = 0;
   int zmq_minor = 0;
@@ -217,6 +217,7 @@ int main(int argc, char *argv[]) {
 #endif
   int enable = 1;
   int sockfd;
+  int debug = 0;
 
   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0) {
     perror("socket");
@@ -233,6 +234,9 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'd')
+    debug = 1;
+
   if (setsockopt(
         sockfd, SOL_SOCKET, SO_TIMESTAMP, &enable, sizeof(enable)) < 0) {
     perror("setsockopt");
@@ -245,16 +249,36 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  filt.data = ~(1<<ICMP_ECHOREPLY);
+  if (setsockopt(
+      sockfd, SOL_RAW, ICMP_FILTER, (char*)&filt, sizeof(filt)) < 0) {
+    perror("setsockopt");
+    return -1;
+  }
+
 #ifdef DISPLAY_ZMQ_VERSION
   zmq_version(&zmq_major, &zmq_minor, &zmq_patch);
   printf("ZMQ %d.%d.%d version in use\n", zmq_major, zmq_minor, zmq_patch);
 #endif
 
+  if (!debug) {
+    chdir("/");
+    close(0);
+    close(1);
+    close(2);
+  }
+
   if (fork() == 0) {
     xmit_thread(sockfd);
   }
 
-  recv_thread(sockfd);
+  if (!debug) {
+    if (fork() == 0) {
+      recv_thread(sockfd);
+    }
+  } else {
+    recv_thread(sockfd);
+  }
   return 0;
 }
 
