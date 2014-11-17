@@ -66,7 +66,6 @@ void publish_ping_result(void *zmqfd, struct in_addr *addr,
   response.usecs = usecs;
 
   zmq_send(zmqfd, &response, sizeof(response), ZMQ_DONTWAIT);
-  printf("Published result for %s\n", response.ip);
 }
 
 
@@ -218,6 +217,12 @@ int main(int argc, char *argv[]) {
   int enable = 1;
   int sockfd;
   int debug = 0;
+
+  /* We do timekeeping, don't disturb us. */
+  if (nice(-15) == -1) {
+    perror("nice");
+    return -1;
+  }
 
   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0) {
     perror("socket");
