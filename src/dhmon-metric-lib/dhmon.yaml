@@ -1,2 +1,3 @@
+mq: 'localhost'
 metric-server: 'localhost'
 redis-server: 'localhost'

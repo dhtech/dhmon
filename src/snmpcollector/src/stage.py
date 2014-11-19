@@ -32,8 +32,8 @@ class Stage(object):
 
   def __init__(self, name, task_queue=None, result_queue=None):
     self.name = name
-    self.task_queue = 'dhmon:%s' % task_queue if task_queue else None
-    self.result_queue = 'dhmon:%s' % result_queue if result_queue else None
+    self.task_queue = 'dhmon:snmp:%s' % task_queue if task_queue else None
+    self.result_queue = 'dhmon:snmp:%s' % result_queue if result_queue else None
     self.task_channel = None
     self.result_channel = None
     self.connection = None

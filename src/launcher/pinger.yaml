@@ -1,5 +1,5 @@
 number_of_daemons: 1
 name: pinger
-period: 1000
+period: 10000
 scripts:
   - /srv/dhmon/src/pinger/ipplan-pinger
