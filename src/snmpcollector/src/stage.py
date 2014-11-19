@@ -60,7 +60,7 @@ class Stage(object):
   def _task_callback(self, channel, method, properties, body):
     action = pickle.loads(body)
     if not isinstance(action, Action):
-      print >>sys.stderr, 'Got non-action in task queue:', repr(body)
+      logging.error('Got non-action in task queue: %s', repr(body))
       channel.basic_ack(delivery_tag=method.delivery_tag)
       return
 
@@ -95,6 +95,7 @@ class Stage(object):
       root.addHandler(ch)
       self._internal_run(args.pidfile, purge_task_queue)
     else:
+      import daemon
       with daemon.DaemonContext():
         self._internal_run(args.pidfile, purge_task_queue)
 
@@ -129,5 +130,5 @@ class Stage(object):
     try:
       self.task_channel.start_consuming()
     except KeyboardInterrupt:
-      print >>sys.stderr, 'Keyboard interrupt, shutting down..'
+      logging.error('Keyboard interrupt, shutting down..')
     self.shutdown()

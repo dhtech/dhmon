@@ -1,5 +1,4 @@
-snmp_workers: 10
-result_savers: 5
+mq: localhost
 snmp:
   access:
     version: 2

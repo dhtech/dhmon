@@ -1,0 +1,34 @@
+# Defaults for dhmon
+
+# == Launchers ==
+# These are easily-scriptable things that run managed by the 'launcher'.
+# The launcher allows you to do stuff like interleaved polling and keeps
+# track of run time of the scripts.
+LAUNCHER="pinger snmpcollector"
+
+# == SNMP collector ==
+# Set these values to > 0 to enable the daemon.
+# Do not forget to make sure that /etc/snmpcollector.yaml is correct.
+
+# The supervisor is the stage that reads ipplan and outputs the work that needs
+# to be done to the next stage. You should not need to run more than one.
+SNMP_SUPERVISORS="1"
+
+# These guys are the ones that do the SNMP walking of the switches.
+# One worker will poll one switch given to it by a supervisor and block during
+# the whole poll phase. If you feel like the collection is too slow, and you
+# have CPU to spare - increase this number.
+SNMP_WORKERS="50"
+
+# This is a single point where all the data points to go to get filtered,
+# mangled and otherwised processed. This makes sure that wrap-arounds are masked
+# and that we save deltas for values that makes sense to save deltas for.
+# NOTE: Currently this is a single-instance only stage, do *not* run >1.
+SNMP_PROCESSORS="1"
+
+# Finally we have the result savers.
+# These guys put the processed output and puts it into dhmon.
+# If the processed queue seems to be the bottleneck and the backends are
+# keeping up, you can increase this number.
+SNMP_SAVERS="5"
+

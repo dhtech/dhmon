@@ -1,12 +1,12 @@
 #!/bin/sh
 
 ### BEGIN INIT INFO
-# Provides:        dhmon
+# Provides:        dhmon-launcher
 # Required-Start:  $network $remote_fs $syslog influxdb
 # Required-Stop:   $network $remote_fs $syslog influxdb
 # Default-Start:   2 3 4 5
 # Default-Stop: 
-# Short-Description: Start dhmon
+# Short-Description: Start dhmon launchers
 ### END INIT INFO
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
@@ -23,15 +23,13 @@ fi
 
 case $1 in
   start)
-    log_daemon_msg "Starting dhmon servers"
-    # Try to update the software as well
-    (cd $DHMON; git pull > /dev/null) || true
+    log_daemon_msg "Starting dhmon launchers"
     mkdir -p $DHMONRUN
     all_status=0
     for launch in $LAUNCHER
     do
       echo -n " $launch"
-      PIDFILE=$DHMONRUN/$launch.pid
+      PIDFILE=$DHMONRUN/launcher.$launch.pid
       start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE \
         --startas $DHMON/src/launcher/launcher -- \
         $DHMON/src/launcher/${launch}.yaml 1 $PIDFILE
@@ -41,30 +39,15 @@ case $1 in
       fi
     done
 
-    if [ "$SNMPCOLLECTOR" = "yes" ]; then
-      echo -n " snmpcollectord"
-      PIDFILE=$DHMONRUN/snmpcollectord.pid
-      if [ ! -f "/etc/snmpcollector.yaml" ]; then
-        echo -n " (no config)"
-        all_status=1
-      else
-        start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE \
-          --startas $DHMON/src/snmpcollector/snmpcollector -- $PIDFILE
-        if [ "$?" -ne 0 ]; then
-          echo -n ' (FAILED)'
-          all_status=1
-        fi
-      fi
-    fi
     log_end_msg $all_status
     ;;
   stop)
-    log_daemon_msg "Stopping dhmon server"
+    log_daemon_msg "Stopping dhmon launchers"
     all_status=0
     for launch in $LAUNCHER
     do
       echo -n " $launch"
-      PIDFILE=$DHMONRUN/$launch.pid
+      PIDFILE=$DHMONRUN/launcher.$launch.pid
       start-stop-daemon --stop -R 10 --quiet --oknodo --pidfile $PIDFILE
       if [ "$?" -ne 0 ]; then
         echo -n ' (FAILED)'
@@ -72,16 +55,6 @@ case $1 in
       fi
       rm -f $PIDFILE
     done
-
-    if [ "$SNMPCOLLECTOR" = "yes" ]; then
-      echo -n " snmpcollectord"
-      PIDFILE=$DHMONRUN/snmpcollectord.pid
-      start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE
-      if [ "$?" -ne 0 ]; then
-        echo -n ' (FAILED)'
-        all_status=1
-      fi
-    fi
 
     log_end_msg $all_status
     ;;
@@ -101,14 +74,9 @@ case $1 in
   status)
     for launch in $LAUNCHER
     do
-      PIDFILE=$DHMONRUN/$launch.pid
+      PIDFILE=$DHMONRUN/launcher.$launch.pid
       status_of_proc -p $PIDFILE "$launch" "dhmon $launch"
     done
-
-    if [ "$SNMPCOLLECTOR" = "yes" ]; then
-      PIDFILE=$DHMONRUN/snmpcollectord.pid
-      status_of_proc -p $PIDFILE "snmpcollectord" "dhmon snmpcollectord"
-    fi
     ;;
   *)
     echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
