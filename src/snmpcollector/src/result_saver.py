@@ -66,7 +66,7 @@ class ResultSaver(stage.Stage):
     except IOError:
       logging.error('Failed to save metrics, ignoring this sample')
 
-    logging.info('Save completed for %d metrics (ignored %d) for %s',
+    logging.debug('Save completed for %d metrics (ignored %d) for %s',
         saved, ignored, target.host)
 
 

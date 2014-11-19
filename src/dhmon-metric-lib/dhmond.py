@@ -78,8 +78,6 @@ def redis_consume(backend, body):
       for key in [metric['host'], metric['metric']]:
         backend.zadd(key, metric['time'], json.dumps(metric))
         backend.zremrangebyscore(key, 0, metric['time'] - CACHE_TIMEOUT)
-    syslog.syslog(
-        syslog.LOG_INFO, 'Ingested %d metrics to Redis' % len(metrics))
   except Exception, e:
     syslog.syslog(
         syslog.LOG_ERR, 'Unable to send metric to Redis: %s' % e.message)
@@ -91,8 +89,6 @@ def influxdb_consume(backend, body):
     for metric in metrics:
       backend.queue(metric)
     backend.finish()
-    syslog.syslog(
-        syslog.LOG_INFO, 'Ingested %d metrics to InfluxDB' % len(metrics))
   except Exception, e:
     syslog.syslog(
         syslog.LOG_ERR, 'Unable to send metric to InfluxDB: %s' % e.message)
