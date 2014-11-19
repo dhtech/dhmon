@@ -9,7 +9,7 @@ import yaml
 
 
 # Remove older entries than this (seconds)
-CACHE_TIMEOUT = 3600
+CACHE_TIMEOUT = 3600 * 1000
 
 
 backend = None
@@ -23,8 +23,8 @@ class BulkMetric(object):
     self.path = 'dh.%s.%s' % (rev_hostname, metric)
     self.hostname = hostname
     self.metric = metric
-    # Truncate on second to make it more backend agnostic
-    self.timestamp = int(timestamp)
+    # Truncate on ms to make it more backend agnostic
+    self.timestamp = int(timestamp * 1000)
     self.value = value
     self.json = json.dumps({
         'host': hostname,
@@ -60,17 +60,25 @@ class InfluxBackend(object):
     self._queue[metric.metric].append(metric)
 
   def finish(self):
-    output = []
     for metric_name, metrics in self._queue.iteritems():
       data = {
         'name': metric_name,
         'columns': ['time', 'host', 'value'],
         'points': []
       }
-      for metric in metrics:
-        data['points'].append((metric.timestamp, metric.hostname, metric.value))
-      output.append(data) 
-    self.socket.sendto(json.dumps(output), self.address)
+      for i, metric in enumerate(metrics):
+        # Split the packet ~10 metrics per packet. InfluxDB seems to have
+        # trouble with fragmented packets.
+        if (i % 10 == 0) and data['points']:
+          self.socket.sendto(json.dumps([data]), self.address)
+          data['points'] = []
+        # InfluxDB requires the time to be float (and in seconds for UDP)
+        data['points'].append(
+            (metric.timestamp / 1000.0, metric.hostname, metric.value))
+
+      # Send the rest
+      if data['points']:
+        self.socket.sendto(json.dumps([data]), self.address)
     self._queue = collections.defaultdict(list)
 
 
