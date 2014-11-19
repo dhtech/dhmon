@@ -1,0 +1,2 @@
+metric-server: 'localhost'
+redis-server: 'localhost'
