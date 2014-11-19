@@ -20,8 +20,10 @@ class BulkMetric(object):
 
 class MqBackend(object):
 
-  def connect(self, host):
-    self.connection = pika.BlockingConnection(pika.ConnectionParameters(host))
+  def connect(self, mq):
+    credentials = pika.PlainCredentials(mq['username'], mq['password'])
+    self.connection = pika.BlockingConnection(
+        pika.ConnectionParameters(mq['host'], credentials=credentials))
     self.result_channel = self.connection.channel()
     self._queue = []
 

@@ -51,7 +51,9 @@ class InfluxBackend(object):
 
 
 def connect(mq, queue):
-  connection = pika.BlockingConnection(pika.ConnectionParameters(mq))
+  credentials = pika.PlainCredentials(mq['username'], mq['password'])
+  connection = pika.BlockingConnection(
+      pika.ConnectionParameters(mq['host'], credentials=credentials))
   channel = connection.channel()
   channel.exchange_declare(exchange='dhmon:metrics', type='fanout')
 
