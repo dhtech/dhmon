@@ -42,15 +42,14 @@ class ResultSaver(stage.Stage):
           value=elapsed)
       metrics.append(bulkmetric)
 
+      value = result.value
       if result.type in self.INTEGER_TYPES:
-        bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
-            hostname=target.host, metric='snmp%s' % oid,
-            value=result.value)
-        metrics.append(bulkmetric)
-        saved += 1
-      else:
-        ignored += 1
-        # TODO(bluecmd): Save this value to redis instead of ignoring it
+        value = int(value)
+
+      bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
+          hostname=target.host, metric='snmp%s' % oid, value=value)
+      metrics.append(bulkmetric)
+      saved += 1
 
     # Save collection stats
     bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
