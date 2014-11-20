@@ -92,6 +92,8 @@ def redis_consume(backend, body):
       combo = '%s.%s' % (metric['host'], metric['metric'])
       timestamp = int(metric['time']) * 1000
       backend.zadd(combo, timestamp, json.dumps(metric))
+      backend.zadd(metric['metric'], timestamp, json.dumps(metric))
+      backend.zadd(metric['host'], timestamp, json.dumps(metric))
   except Exception, e:
     syslog.syslog(
         syslog.LOG_ERR, 'Unable to send metric to Redis: %s' % e.message)

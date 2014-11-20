@@ -40,8 +40,10 @@ class Stage(object):
 
   def startup(self):
     config.load('/etc/snmpcollector.yaml')
+    mq = config.config['mq']
+    credentials = pika.PlainCredentials(mq['username'], mq['password'])
     self.connection = pika.BlockingConnection(
-        pika.ConnectionParameters(config.config['mq']))
+        pika.ConnectionParameters(mq['host'], credentials=credentials))
     if self.result_queue:
       self.result_channel = self.connection.channel()
     logging.info('Started %s', self.name)
