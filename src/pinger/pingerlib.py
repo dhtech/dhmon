@@ -42,7 +42,7 @@ def _receive_thread(queue, timeout):
     channel.close()
 
   if timeout:
-    connection.add_timeout(1, done)
+    connection.add_timeout(timeout, done)
   try:
     channel.basic_consume(consume, queue=response_queue, no_ack=True)
     channel.start_consuming()
