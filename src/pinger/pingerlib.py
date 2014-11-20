@@ -19,19 +19,20 @@ def connect():
   return connection
 
 
-connection = connect()
-
 
 def ping(ips):
+  connection = connect()
   channel = connection.channel()
   request_queue = 'dhmon:pinger:req:%s' % socket.getfqdn()
   for ip in ips:
     channel.basic_publish(exchange='', routing_key=request_queue, body=ip)
-  channel.close()
+  connection.close()
 
 
 def _receive_thread(queue, timeout):
+  connection = connect()
   channel = connection.channel()
+
   response_queue = 'dhmon:pinger:resp:%s' % socket.getfqdn()
   def consume(channel, method, properties, body):
     ip, secs, usecs = json.loads(body)
@@ -39,12 +40,19 @@ def _receive_thread(queue, timeout):
 
   def done():
     channel.close()
-    queue.put(None)
 
   if timeout:
     connection.add_timeout(1, done)
   channel.basic_consume(consume, queue=response_queue, no_ack=True)
-  channel.start_consuming()
+  try:
+    channel.start_consuming()
+  except NameError, e:
+    # There is a bug in pika in Debian 7.7, this is a workaround.
+    # The bug is triggered when we want to call a timeout callback,
+    # so this works just fine.
+    pass
+  queue.put(None)
+  connection.close()
 
 
 def receive(timeout=None):
