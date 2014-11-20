@@ -31,13 +31,17 @@ def transmit_thread(sockfd):
 
   def consume(channel, method, properties, body):
     try:
-      dhmonpinger.transmit(sockfd, body)
-    except IOError, e:
+      for ip in json.loads(body):
+        dhmonpinger.transmit(sockfd, ip)
+    except Exception, e:
       syslog.syslog(syslog.LOG_ERR, 'Got order to ping "%s", failed: %s' % (
           body, str(e)))
 
-  channel.basic_consume(consume, queue=queue, no_ack=True)
-  channel.start_consuming()
+  try:
+    channel.basic_consume(consume, queue=queue, no_ack=True)
+    channel.start_consuming()
+  except Exception, e:
+    syslog.syslog(syslog.LOG_ERR, 'INTERNAL ERROR in pinger: %s' % str(e))
 
 
 def receive_thread(sockfd):

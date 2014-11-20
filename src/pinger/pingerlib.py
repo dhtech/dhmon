@@ -24,11 +24,9 @@ def ping(ips):
   connection = connect()
   channel = connection.channel()
   request_queue = 'dhmon:pinger:req:%s' % socket.getfqdn()
-  for ip in ips:
-    channel.basic_publish(
-        exchange='', routing_key=request_queue, body=ip,
-        properties=pika.BasicProperties(expiration='1000'))
-  connection.close()
+  channel.basic_publish(
+      exchange='', routing_key=request_queue, body=json.dumps(ips),
+      properties=pika.BasicProperties(expiration='1000'))
 
 
 def _receive_thread(queue, timeout):
@@ -57,12 +55,12 @@ def _receive_thread(queue, timeout):
     # Silently ignore these, it's usually because the queue isn't created yet
     pass
   queue.put(None)
-  connection.close()
 
 
 def receive(timeout=None):
   queue = Queue.Queue()
   t = threading.Thread(target=_receive_thread, args=(queue, timeout))
+  t.daemon = True
   t.start()
 
   while True:

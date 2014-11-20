@@ -1,2 +1,4 @@
+Please use python-pika from wheezy-backports or later
+
 Install:
   sudo python setup.py install
