@@ -73,7 +73,7 @@ static PyObject *transmit(PyObject *self, PyObject *args) {
   }
 
   if (inet_pton(AF_INET, textaddr, &targetaddr.sin_addr) != 1)
-    return PyErr_SetFromErrno(PyExc_IOError);
+    return PyErr_Format(PyExc_IOError, "inet_pton failed for IP");
 
   targetaddr.sin_family = AF_INET;
   packet.ip.daddr = targetaddr.sin_addr.s_addr;
@@ -166,7 +166,7 @@ static PyObject *receive(PyObject *self, PyObject *args) {
     }
 
     if (inet_ntop(AF_INET, &from_addr.sin_addr, ip, sizeof(ip)) == NULL)
-      return PyErr_SetFromErrno(PyExc_IOError);
+      return PyErr_Format(PyExc_IOError, "inet_ntop failed for IP");
 
     return Py_BuildValue("sii", ip, secs, usecs);
   }

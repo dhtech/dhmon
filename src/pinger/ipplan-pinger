@@ -2,23 +2,12 @@
 import dhmon
 import socket
 import sqlite3
-import struct
 import sys
 import time
-import zmq
+
+import pingerlib
 
 this_host = socket.gethostname()
-
-zmq_context = zmq.Context()
-receiver = zmq_context.socket(zmq.SUB)
-receiver.setsockopt(zmq.SUBSCRIBE, '')
-receiver.connect('tcp://localhost:5561')
-
-sender = zmq_context.socket(zmq.PUB)
-sender.connect('tcp://localhost:5560')
-
-# Give the subscriber some time to subscribe
-time.sleep(0.1)
 
 db = sqlite3.connect('/etc/ipplan.db')
 cursor = db.cursor()
@@ -27,20 +16,12 @@ sql = ("SELECT name, ipv4_addr_txt FROM host")
 # Mark current time as the datapoint time
 timestamp = time.time()
 
-hosts = {}
-for host, ipv4 in cursor.execute(sql).fetchall():
-  hosts[ipv4] = host
-  sender.send(str(ipv4), zmq.NOBLOCK)
-
-# Give up after 500 ms
-receiver.RCVTIMEO = 500
+hosts = {ipv4: host for host, ipv4 in cursor.execute(sql).fetchall()}
+pingerlib.ping(hosts.keys())
 
 metrics = []
 try:
-  while True:
-    res = receiver.recv()
-    ip, secs, usecs = struct.unpack('16sII', receiver.recv())
-    ip = ip.strip('\x00')
+  for ip, secs, usecs in pingerlib.receive(1):
     host = hosts[ip]
     metrics.append(dhmon.BulkMetric(
         timestamp=timestamp, hostname=host,
