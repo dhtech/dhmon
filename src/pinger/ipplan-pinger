@@ -40,9 +40,10 @@ try:
   while True:
     res = receiver.recv()
     ip, secs, usecs = struct.unpack('16sII', receiver.recv())
+    ip = ip.strip('\x00')
+    host = hosts[ip]
     metrics.append(dhmon.BulkMetric(
-        timestamp=timestamp,
-        hostname=hosts[ip.strip('\x00')],
+        timestamp=timestamp, hostname=host,
         metric='ipplan-pinger.%s.us' % this_host,
         value=secs*1000000 + usecs))
 except zmq.error.Again:

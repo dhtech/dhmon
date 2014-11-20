@@ -1,18 +1,26 @@
 #!/usr/bin/env python
 import collections
 import json
+import memcache
 import os
 import pika
 import redis
 import socket
 import sys
 import syslog
+import threading
 import time
 import yaml
 
 
 # Remove older entries than this (seconds)
-CACHE_TIMEOUT = 3600 * 1000
+REDIS_TIMEOUT = 3600 * 1000
+
+# How often to run the cleanup command
+REDIS_CLEAN_INTERVAL = 10*60
+
+# Memcache expiry setting on entries (seconds)
+MEMCACHE_TTL = 3600
 
 
 # TODO(bluecmd): Rewrite this to use the POST API
@@ -24,6 +32,12 @@ class InfluxBackend(object):
     self._queue = collections.defaultdict(list)
 
   def queue(self, metric):
+    # Ignore non-integer metrics for InfluxDB
+    try:
+      if str(int(metric['value'])) != str(metric['value']):
+        return
+    except ValueError:
+      return
     self._queue[metric['metric']].append(metric)
 
   def finish(self):
@@ -40,9 +54,9 @@ class InfluxBackend(object):
           self.socket.sendto(json.dumps([data]), self.address)
           data['points'] = []
         # InfluxDB requires the time to be float (and in seconds for UDP)
-        data['points'].append(
-            (int(metric['time'] * 1000.0) / 1000.0,
-            metric['host'], metric['value']))
+        data['points'].append((
+            int(int(metric['time']) * 1000.0) / 1000.0,
+            metric['host'], int(metric['value'])))
 
       # Send the rest
       if data['points']:
@@ -75,12 +89,24 @@ def redis_consume(backend, body):
   metrics = parse_metrics(body)
   try:
     for metric in metrics:
-      for key in [metric['host'], metric['metric']]:
-        backend.zadd(key, metric['time'], json.dumps(metric))
-        backend.zremrangebyscore(key, 0, metric['time'] - CACHE_TIMEOUT)
+      combo = '%s.%s' % (metric['host'], metric['metric'])
+      timestamp = int(metric['time']) * 1000
+      backend.zadd(combo, timestamp, json.dumps(metric))
   except Exception, e:
     syslog.syslog(
         syslog.LOG_ERR, 'Unable to send metric to Redis: %s' % e.message)
+
+
+def redis_clean():
+  backend = redis.StrictRedis(redis_server)
+  while True:
+    timestamp = int(time.time() * 1000)
+    for key in backend.keys():
+      backend.zremrangebyscore(key, 0, timestamp - REDIS_TIMEOUT)
+    elapsed = int(time.time() * 1000) - timestamp
+    syslog.syslog(syslog.LOG_INFO, 'Redis cleaner is done, it took %d ms' % (
+        elapsed))
+    time.sleep(REDIS_CLEAN_INTERVAL)
 
 
 def influxdb_consume(backend, body):
@@ -92,6 +118,17 @@ def influxdb_consume(backend, body):
   except Exception, e:
     syslog.syslog(
         syslog.LOG_ERR, 'Unable to send metric to InfluxDB: %s' % e.message)
+
+
+def memcache_consume(backend, body):
+  metrics = parse_metrics(body)
+  try:
+    for metric in metrics:
+      combo = '%s.%s' % (metric['host'], metric['metric'])
+      backend.set(str(combo), json.dumps(metric), time=MEMCACHE_TTL)
+  except Exception, e:
+    syslog.syslog(
+        syslog.LOG_ERR, 'Unable to send metric to Memcache: %s' % e.message)
 
 
 def consume(mq, backend, queue, consumer):
@@ -113,11 +150,15 @@ if __name__ == '__main__':
 
   metric_server = config.get('metric-server', None)
   if not metric_server:
-    raise KeyError('No "metric_server" key in config file /etc/dhmon.yaml')
+    raise KeyError('No "metric-server" key in config file /etc/dhmon.yaml')
 
   redis_server = config.get('redis-server', None)
   if not redis_server:
-    raise KeyError('No "redis_server" key in config file /etc/dhmon.yaml')
+    raise KeyError('No "redis-server" key in config file /etc/dhmon.yaml')
+
+  memcache_server = config.get('memcache-server', None)
+  if not memcache_server:
+    raise KeyError('No "memcache-server" key in config file /etc/dhmon.yaml')
 
   os.close(0)
   os.close(1)
@@ -128,5 +169,11 @@ if __name__ == '__main__':
     backend.connect(metric_server)
     consume(mq, backend, 'dhmon:metrics:influxdb', influxdb_consume)
   elif not os.fork():
+    redis_clean_thread = threading.Thread(target=redis_clean)
+    redis_clean_thread.daemon = True
+    redis_clean_thread.start()
     backend = redis.StrictRedis(redis_server)
     consume(mq, backend, 'dhmon:metrics:redis', redis_consume)
+  elif not os.fork():
+    backend = memcache.Client(['%s:11211' % memcache_server])
+    consume(mq, backend, 'dhmon:metrics:memcache', memcache_consume)

@@ -4,3 +4,4 @@ mq:
   password: 'dhmon'
 metric-server: 'localhost'
 redis-server: 'localhost'
+memcache-server: 'localhost'
