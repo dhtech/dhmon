@@ -21,8 +21,17 @@ REDIS_SHORT_TIMEOUT = 60 * 1000
 # How often to run the cleanup command
 REDIS_CLEAN_INTERVAL = 60 * 5
 
+# Be gentle to slow backends, we use memcache for low-latency stuff
+REDIS_HOLDOFF = 30 * 1000
+INFLUXDB_HOLDOFF = 14 * 1000
+
 # Memcache expiry setting on entries (seconds)
 MEMCACHE_TTL = 3600
+
+
+# This dict holds the last time a metric was updated, used for holdoff
+redis_metric_time = {}
+influxdb_metric_time = {}
 
 
 # TODO(bluecmd): Rewrite this to use the POST API
@@ -88,10 +97,26 @@ def parse_metrics(data):
   return None
 
 
+def is_holdoff(metric_time, metric, holdoff):
+  timestamp = int(metric['time']) * 1000
+  metric_id = '%s.%s.%s' % (
+      metric['metric'], metric['host'], metric['prober'])
+
+  # Apply rate limit for redis, it's not super quick
+  last_stamp = metric_time.get(metric_id, 0)
+  if last_stamp > timestamp - holdoff:
+    return True
+
+  metric_time[metric_id] = timestamp
+  return False
+
+
 def redis_consume(backend, body):
   metrics = parse_metrics(body)
   try:
     for metric in metrics:
+      if is_holdoff(redis_metric_time, metric, REDIS_HOLDOFF):
+        continue
       timestamp = int(metric['time']) * 1000
       backend.zadd('metric:' + metric['metric'], timestamp, json.dumps({
           'host': metric['host'],
@@ -129,6 +154,8 @@ def influxdb_consume(backend, body):
   metrics = parse_metrics(body)
   try:
     for metric in metrics:
+      if is_holdoff(influxdb_metric_time, metric, INFLUXDB_HOLDOFF):
+        continue
       backend.queue(metric)
     backend.finish()
   except Exception, e:
