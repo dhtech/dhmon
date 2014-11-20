@@ -52,12 +52,15 @@ class Stage(object):
     logging.info('Terminating %s', self.name)
     self.connection.close()
 
-  def push(self, action):
+  def push(self, action, expire=None):
     if not self.result_channel:
       return
+    properties = pika.BasicProperties(
+        expiration=str(expire) if expire else None)
     self.result_channel.basic_publish(
         exchange='', routing_key=self.result_queue,
-        body=pickle.dumps(action, protocol=pickle.HIGHEST_PROTOCOL))
+        body=pickle.dumps(action, protocol=pickle.HIGHEST_PROTOCOL),
+        properties=properties)
 
   def _task_callback(self, channel, method, properties, body):
     action = pickle.loads(body)

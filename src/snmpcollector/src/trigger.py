@@ -12,4 +12,4 @@ class Trigger(stage.Stage):
 if __name__ == '__main__':
   stage = Trigger()
   stage.startup()
-  stage.push(supervisor.TriggerAction())
+  stage.push(supervisor.TriggerAction(), expire=5000)
