@@ -7,17 +7,22 @@ import yaml
 
 
 backend = None
+_prober_name = socket.gethostname()
 
 
+# TODO(bluecmd): Share this code with dhmond, offer json dump/load functions
 class BulkMetric(object):
 
-  def __init__(self, timestamp, hostname, metric, value):
+  def __init__(self, timestamp, hostname, metric, value, prober=None):
     self.hostname = hostname
+    self.prober = prober if prober else _prober_name
     self.metric = metric
     self.timestamp = timestamp
     self.value = value
 
 
+# TODO(bluecmd): Incorporate this into connect, making this the goto-function
+# for dhmon programs.
 class MqBackend(object):
 
   def connect(self, mq):
@@ -31,6 +36,7 @@ class MqBackend(object):
     self._queue.append({
         'metric': metric.metric,
         'host': metric.hostname,
+        'prober': metric.prober,
         'time': metric.timestamp,
         'value': metric.value,
         })
@@ -55,9 +61,9 @@ def connect(backend_cls=MqBackend):
 
 def metric(metric, value, hostname=None, timestamp=None):
   if timestamp is None:
-      timestamp = int(time.time())
+    timestamp = int(time.time())
   if hostname is None:
-      hostname = socket.getfqdn()
+    hostname = socket.getfqdn()
 
   metricbulk([BulkMetric(timestamp=timestamp, hostname=hostname,
                          metric=metric, value=value)])
@@ -67,7 +73,6 @@ def metricbulk(values):
   if backend is None:
     connect()
 
-  ops = []
   for bulkmetric in values:
     backend.queue(bulkmetric)
 

@@ -1,13 +1,10 @@
 #!/usr/bin/env python2
 import dhmon
-import socket
 import sqlite3
 import sys
 import time
 
 import pingerlib
-
-this_host = socket.gethostname()
 
 db = sqlite3.connect('/etc/ipplan.db')
 cursor = db.cursor()
@@ -25,8 +22,7 @@ try:
     host = hosts[ip]
     metrics.append(dhmon.BulkMetric(
         timestamp=timestamp, hostname=host,
-        metric='ipplan-pinger.%s.us' % this_host,
-        value=secs*1000000 + usecs))
+        metric='ipplan-pinger.us', value=secs*1000000 + usecs))
 except zmq.error.Again:
   pass
 

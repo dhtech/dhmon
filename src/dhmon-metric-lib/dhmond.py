@@ -12,7 +12,6 @@ import threading
 import time
 import yaml
 
-
 # Remove older entries than this (seconds)
 REDIS_TIMEOUT = 3600 * 1000
 
@@ -47,7 +46,7 @@ class InfluxBackend(object):
     for metric_name, metrics in self._queue.iteritems():
       data = {
         'name': metric_name,
-        'columns': ['time', 'host', 'value'],
+        'columns': ['time', 'host', 'prober', 'value'],
         'points': []
       }
       for i, metric in enumerate(metrics):
@@ -59,7 +58,7 @@ class InfluxBackend(object):
         # InfluxDB requires the time to be float (and in seconds for UDP)
         data['points'].append((
             int(int(metric['time']) * 1000.0) / 1000.0,
-            metric['host'], int(metric['value'])))
+            metric['host'], metric['prober'], int(metric['value'])))
 
       # Send the rest
       if data['points']:
@@ -79,6 +78,7 @@ def connect(mq, queue):
   return channel
 
 
+# TODO(bluecmd): Share stuff like this with dhmon lib.
 def parse_metrics(data):
   try:
     return json.loads(data)
@@ -98,10 +98,12 @@ def redis_consume(backend, body):
       backend.set('last:' + combo, json.dumps(metric))
       backend.zadd('metric:' + metric['metric'], timestamp, json.dumps({
           'host': metric['host'],
+          'prober': metric['prober'],
           'value': metric['value']
       }))
       backend.zadd('host:' + metric['host'], timestamp, json.dumps({
           'metric': metric['metric'],
+          'prober': metric['prober'],
           'value': metric['value']
       }))
   except Exception, e:
