@@ -16,6 +16,9 @@ import yaml
 # Remove older entries than this (seconds)
 REDIS_TIMEOUT = 3600 * 1000
 
+# Use this timeout for metric grouped collection
+REDIS_SHORT_TIMEOUT = 60 * 1000
+
 # How often to run the cleanup command
 REDIS_CLEAN_INTERVAL = 10*60
 
@@ -92,8 +95,15 @@ def redis_consume(backend, body):
       combo = '%s.%s' % (metric['host'], metric['metric'])
       timestamp = int(metric['time']) * 1000
       backend.zadd(combo, timestamp, json.dumps(metric))
-      backend.zadd(metric['metric'], timestamp, json.dumps(metric))
-      backend.zadd(metric['host'], timestamp, json.dumps(metric))
+      backend.set('last:' + combo, json.dumps(metric))
+      backend.zadd('metric:' + metric['metric'], timestamp, json.dumps({
+          'host': metric['host'],
+          'value': metric['value']
+      }))
+      backend.zadd('host:' + metric['host'], timestamp, json.dumps({
+          'metric': metric['metric'],
+          'value': metric['value']
+      }))
   except Exception, e:
     syslog.syslog(
         syslog.LOG_ERR, 'Unable to send metric to Redis: %s' % e.message)
@@ -104,7 +114,12 @@ def redis_clean():
   while True:
     timestamp = int(time.time() * 1000)
     for key in backend.keys():
-      backend.zremrangebyscore(key, 0, timestamp - REDIS_TIMEOUT)
+      if key.startswith('metric:') or key.startswith('host:'):
+        backend.zremrangebyscore(key, 0, timestamp - REDIS_SHORT_TIMEOUT)
+      elif key.startswith('last:'):
+        continue
+      else:
+        backend.zremrangebyscore(key, 0, timestamp - REDIS_TIMEOUT)
     elapsed = int(time.time() * 1000) - timestamp
     syslog.syslog(syslog.LOG_INFO, 'Redis cleaner is done, it took %d ms' % (
         elapsed))
@@ -126,8 +141,8 @@ def memcache_consume(backend, body):
   metrics = parse_metrics(body)
   try:
     for metric in metrics:
-      combo = '%s.%s' % (metric['host'], metric['metric'])
-      backend.set(str(combo), json.dumps(metric), time=MEMCACHE_TTL)
+      key = 'last:%s.%s' % (metric['host'], metric['metric'])
+      backend.set(str(key), json.dumps(metric), time=MEMCACHE_TTL)
   except Exception, e:
     syslog.syslog(
         syslog.LOG_ERR, 'Unable to send metric to Memcache: %s' % e.message)
