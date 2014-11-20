@@ -29,7 +29,7 @@ case $1 in
     ;;
   stop)
     log_daemon_msg "Stopping dhmon pingerd"
-    pkill -u nobody pingerd
+    pkill -u nobody -f "$DHMON/src/pinger/pingerd"
     log_end_msg $?
     ;;
   restart|force-reload)
@@ -46,7 +46,12 @@ case $1 in
     exit 3
     ;;
   status)
-    status_of_proc "pingerd" "dhmon pingerd"
+    pgrep -u nobody -f $DHMON/src/pinger/pingerd -c > /dev/null
+    if [ "$?" = "0" ]; then
+      log_success_msg "dhmon pingerd is running"
+    else
+      log_failure_msg "dhmon pingerd is not running"
+    fi
     ;;
   *)
     echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
