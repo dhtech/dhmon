@@ -92,10 +92,7 @@ def redis_consume(backend, body):
   metrics = parse_metrics(body)
   try:
     for metric in metrics:
-      combo = '%s.%s' % (metric['host'], metric['metric'])
       timestamp = int(metric['time']) * 1000
-      backend.zadd(combo, timestamp, json.dumps(metric))
-      backend.set('last:' + combo, json.dumps(metric))
       backend.zadd('metric:' + metric['metric'], timestamp, json.dumps({
           'host': metric['host'],
           'prober': metric['prober'],

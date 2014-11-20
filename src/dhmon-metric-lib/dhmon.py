@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import json
+import logging
 import pika
 import socket
 import time
@@ -26,24 +27,35 @@ class BulkMetric(object):
 class MqBackend(object):
 
   def connect(self, mq):
+    logging.getLogger('pika').setLevel(logging.ERROR)
     credentials = pika.PlainCredentials(mq['username'], mq['password'])
     self.connection = pika.BlockingConnection(
         pika.ConnectionParameters(mq['host'], credentials=credentials))
-    self.result_channel = self.connection.channel()
     self._queue = []
+    self._chunk = []
 
   def queue(self, metric):
-    self._queue.append({
+    self._chunk.append({
         'metric': metric.metric,
         'host': metric.hostname,
         'prober': metric.prober,
         'time': metric.timestamp,
         'value': metric.value,
         })
+    # Be nice to RabbitMQ, odd problems with larger chunks with wheezy
+    if len(self._chunk) >= 100:
+      self._queue.append(json.dumps(self._chunk))
+      self._chunk = []
 
   def finish(self):
-    self.result_channel.basic_publish(
-        exchange='dhmon:metrics', routing_key='', body=json.dumps(self._queue))
+    result_channel = self.connection.channel()
+    for chunk in self._queue:
+      result_channel.basic_publish(
+          exchange='dhmon:metrics', routing_key='', body=chunk)
+    if self._chunk:
+      result_channel.basic_publish(
+          exchange='dhmon:metrics', routing_key='', body=json.dumps(self._chunk))
+    result_channel.close()
     self._queue = []
 
 
