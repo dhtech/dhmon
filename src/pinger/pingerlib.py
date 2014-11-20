@@ -45,13 +45,16 @@ def _receive_thread(queue, timeout):
 
   if timeout:
     connection.add_timeout(1, done)
-  channel.basic_consume(consume, queue=response_queue, no_ack=True)
   try:
+    channel.basic_consume(consume, queue=response_queue, no_ack=True)
     channel.start_consuming()
   except NameError, e:
     # There is a bug in pika in Debian 7.7, this is a workaround.
     # The bug is triggered when we want to call a timeout callback,
     # so this works just fine.
+    pass
+  except pika.exceptions.AMQPChannelError, e:
+    # Silently ignore these, it's usually because the queue isn't created yet
     pass
   queue.put(None)
   connection.close()

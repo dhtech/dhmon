@@ -43,7 +43,7 @@ def transmit_thread(sockfd):
 def receive_thread(sockfd):
   channel = connect()
   queue = 'dhmon:pinger:resp:%s' % socket.getfqdn()
-  channel.queue_declare(queue=queue, auto_delete=True)
+  channel.queue_declare(queue=queue)
 
   try:
     while True:
