@@ -19,7 +19,7 @@ REDIS_TIMEOUT = 3600 * 1000
 REDIS_SHORT_TIMEOUT = 60 * 1000
 
 # How often to run the cleanup command
-REDIS_CLEAN_INTERVAL = 60
+REDIS_CLEAN_INTERVAL = 60 * 5
 
 # Memcache expiry setting on entries (seconds)
 MEMCACHE_TTL = 3600

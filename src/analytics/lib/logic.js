@@ -1,41 +1,46 @@
+// TODO(bluecmd): Replace the config file to use /etc/dhmon.yaml where sensible
 var config = require('./config').Config(__dirname+'/config.ini').get();
 var logger = require('./logger').Logging().get('project-debug.log');
 var util = require('util');
-
-// Load Graphite API
-var graphite = require('./graphite-api');
-var graphiteClient = graphite.createClient(util.format('http://%s:%d', 
-      config.graphite.host, config.graphite.port));
 
 // Connect to Redis
 var redis = require('redis');
 var db = redis.createClient(config.redis.port, config.redis.host);
 
-var someExamplePath = function(callback) {
-  graphiteClient.query('server.rojter.load', {'from': '-1min'}, function(data) {
-    logger.debug(data);
-    callback(data[0]["datapoints"][0][0]);
-  });
-};
+// Connect to Memcache
+var Memcached = require('memcached');
+var memcached = new Memcached('localhost:11211');
 
 var switchesStatus = function(callback) {
-  graphiteClient.query('dh.local.dreamhack.event.*.ipplan-pinger.us', {'maxDataPoints': 1}, function(data) {
+  db.zrange('metric:ipplan-pinger.us', 0, -1, 'withscores',
+            function(err, data) {
+    var metrics = {};
     var switches = {};
-    for ( var i in data ) {
-        // Format name to form the hostname
-        var name = data[i]["target"];
-        name = name.split('.');
-        name.splice(0, 1);
-        for ( var j = 0; j < 2; j++ ) {
-            name.splice(name.length-1, 1);
-        }
-        name.reverse();
-        name = name.join(".");
-    
-        // Set status
-        switches[name] = data[i]["datapoints"].length == 0;
+    for ( var i = 0; i < data.length; i+=2 ) {
+      var entry = JSON.parse(data[i]);
+      metric = 'last:' + entry['host'] + '.ipplan-pinger.us';
+      var name = entry['host'];
+      metrics[metric] = name;
+
+      // The score is integer with ms precision
+      var last_beat = ((new Date().getTime()) - data[i+1])/1000;
+      if (switches[name] < last_beat)
+        continue
+      switches[name] = last_beat;
     }
-    callback(switches);
+
+    // Get latest response from memcached to get low-latency updates
+    memcached.getMulti(Object.keys(metrics), function(err, memdata) {
+      for ( var i in memdata ) {
+
+        var entry = JSON.parse(memdata[i]);
+        // The raw entry is using a double with second precision
+        switches[metrics[i]] = Math.floor(
+            (new Date().getTime())/1000.0 - entry['time']);
+        logger.debug('memdata', i, memdata[i], entry['time']);
+      }
+      callback(switches);
+    });
   });
 };
 
@@ -50,10 +55,6 @@ var documentation = function() {
 }
 
 var paths = {
-  "some.example.path": {
-    "method": someExamplePath,
-    "what": "An example path"
-  },
   "switches.status": {
     "method": switchesStatus,
     "what": "Status of all switched currently being polled"
@@ -63,7 +64,7 @@ var paths = {
 var updateCache = function(path, data, callback) {
   logger.debug('Updating cache for path:', path);
   data = JSON.stringify(data);
-  db.set(path, data, 'NX', 'EX', 60, function(err, reply) {
+  db.set('analytics:' + path, data, 'NX', 'EX', 10, function(err, reply) {
     callback(data);
   });
 };
@@ -76,7 +77,7 @@ var retrieve = function(path, refresh, callback) {
         updateCache(path, data, callback)
       });
     } else {
-      var cache = db.get(path, function(err, reply) {
+      var cache = db.get('analytics:' + path, function(err, reply) {
         if ( typeof reply != 'undefined' && reply ) {
           callback(reply);
         } else {
