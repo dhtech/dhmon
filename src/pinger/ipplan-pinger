@@ -14,6 +14,9 @@ sql = ("SELECT name, ipv4_addr_txt FROM host")
 timestamp = time.time()
 
 hosts = {ipv4: host for host, ipv4 in cursor.execute(sql).fetchall()}
+if '-d' in sys.argv:
+  for ipv4, host in hosts.iteritems():
+    print 'Sending %s %s' % (host, ipv4)
 pingerlib.ping(hosts.keys())
 
 metrics = []
@@ -23,6 +26,8 @@ try:
     metrics.append(dhmon.BulkMetric(
         timestamp=timestamp, hostname=host,
         metric='ipplan-pinger.us', value=secs*1000000 + usecs))
+    if '-d' in sys.argv:
+      print '%s %s' % (host, secs*1000000 + usecs)
 except zmq.error.Again:
   pass
 
