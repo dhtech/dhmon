@@ -25,7 +25,9 @@ def ping(ips):
   channel = connection.channel()
   request_queue = 'dhmon:pinger:req:%s' % socket.getfqdn()
   for ip in ips:
-    channel.basic_publish(exchange='', routing_key=request_queue, body=ip)
+    channel.basic_publish(
+        exchange='', routing_key=request_queue, body=ip,
+        properties=pika.BasicProperties(expiration='1000'))
   connection.close()
 
 
