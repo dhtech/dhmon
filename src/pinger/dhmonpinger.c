@@ -18,6 +18,7 @@
 #define PINGER_TTL 128
 #define PINGER_CONTROL_SIZE 512
 #define PINGER_MAGIC 0xc001c0de
+#define PINGER_RCVBUF 3670016
 
 typedef struct __attribute__ ((__packed__)) {
   struct iphdr ip;
@@ -176,6 +177,7 @@ static PyObject *receive(PyObject *self, PyObject *args) {
 static PyObject *create_socket(PyObject *self, PyObject *unused_args) {
   struct icmp_filter filt;
   int enable = 1;
+  int rcvbuf = PINGER_RCVBUF;
   int sockfd;
 
   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0)
@@ -183,6 +185,12 @@ static PyObject *create_socket(PyObject *self, PyObject *unused_args) {
 
   if (setsockopt(
         sockfd, SOL_SOCKET, SO_TIMESTAMP, &enable, sizeof(enable)) < 0)
+    return PyErr_SetFromErrno(PyExc_IOError);
+
+  /* This requires changing net.core.rmem_max, but is needed to not drop
+   * ICMP replies. */
+  if (setsockopt(
+        sockfd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0)
     return PyErr_SetFromErrno(PyExc_IOError);
 
   if (setsockopt(
