@@ -34,6 +34,18 @@ redis_metric_time = {}
 influxdb_metric_time = {}
 
 
+class Error(Exception):
+  """Base exception for this module."""
+
+
+class AccessDeniedError(Error):
+  """User is not allowed to access this metric."""
+
+
+class MalformedMetricError(Error):
+  """Metrics passed in queue is malformed."""
+
+
 # TODO(bluecmd): Rewrite this to use the POST API
 class InfluxBackend(object):
 
@@ -89,12 +101,20 @@ def connect(mq, queue):
 
 # TODO(bluecmd): Share stuff like this with dhmon lib.
 def parse_metrics(data):
+  """Try parsing a metric."""
   try:
     return json.loads(data)
   except ValueError, e:
-    syslog.syslog(
-        syslog.LOG_ERR, 'Unable to parse JSON metrics: %s' % e.message)
+    raise MalformedMetricError('JSON error: ' + e.message)
   return None
+
+
+def check_acl(metrics, queue, user):
+  """Make sure that the given user is allowed to post metrics to a backend."""
+  if not user:
+    raise AccessDeniedError('No user supplied')
+  if user == 'external':
+    raise AccessDeniedError('User is denied')
 
 
 def is_holdoff(metric_time, metric, holdoff):
@@ -111,26 +131,21 @@ def is_holdoff(metric_time, metric, holdoff):
   return False
 
 
-def redis_consume(backend, body):
-  metrics = parse_metrics(body)
-  try:
-    for metric in metrics:
-      if is_holdoff(redis_metric_time, metric, REDIS_HOLDOFF):
-        continue
-      timestamp = int(metric['time']) * 1000
-      backend.zadd('metric:' + metric['metric'], timestamp, json.dumps({
-          'host': metric['host'],
-          'prober': metric['prober'],
-          'value': metric['value']
-      }))
-      backend.zadd('host:' + metric['host'], timestamp, json.dumps({
-          'metric': metric['metric'],
-          'prober': metric['prober'],
-          'value': metric['value']
-      }))
-  except Exception, e:
-    syslog.syslog(
-        syslog.LOG_ERR, 'Unable to send metric to Redis: %s' % e.message)
+def redis_consume(backend, metrics):
+  for metric in metrics:
+    if is_holdoff(redis_metric_time, metric, REDIS_HOLDOFF):
+      continue
+    timestamp = int(metric['time']) * 1000
+    backend.zadd('metric:' + metric['metric'], timestamp, json.dumps({
+        'host': metric['host'],
+        'prober': metric['prober'],
+        'value': metric['value']
+    }))
+    backend.zadd('host:' + metric['host'], timestamp, json.dumps({
+        'metric': metric['metric'],
+        'prober': metric['prober'],
+        'value': metric['value']
+    }))
 
 
 def redis_clean():
@@ -150,35 +165,42 @@ def redis_clean():
     time.sleep(REDIS_CLEAN_INTERVAL)
 
 
-def influxdb_consume(backend, body):
-  metrics = parse_metrics(body)
-  try:
-    for metric in metrics:
-      if is_holdoff(influxdb_metric_time, metric, INFLUXDB_HOLDOFF):
-        continue
-      backend.queue(metric)
-    backend.finish()
-  except Exception, e:
-    syslog.syslog(
-        syslog.LOG_ERR, 'Unable to send metric to InfluxDB: %s' % e.message)
+def influxdb_consume(backend, metrics):
+  for metric in metrics:
+    if is_holdoff(influxdb_metric_time, metric, INFLUXDB_HOLDOFF):
+      continue
+    backend.queue(metric)
+  backend.finish()
 
 
-def memcache_consume(backend, body):
-  metrics = parse_metrics(body)
-  try:
-    for metric in metrics:
-      key = 'last:%s.%s' % (metric['host'], metric['metric'])
-      backend.set(str(key), json.dumps(metric), time=MEMCACHE_TTL)
-  except Exception, e:
-    syslog.syslog(
-        syslog.LOG_ERR, 'Unable to send metric to Memcache: %s' % e.message)
+def memcache_consume(backend, metrics):
+  for metric in metrics:
+    key = 'last:%s.%s' % (metric['host'], metric['metric'])
+    backend.set(str(key), json.dumps(metric), time=MEMCACHE_TTL)
 
 
 def consume(mq, backend, queue, consumer):
   channel = connect(mq, queue)
 
   def callback(channel, method, properties, body):
-    consumer(backend, body)
+    # TODO(bluecmd): Maybe we want to share this among the three threads,
+    # but that's complex. Let's do it one for every consumer for now.
+    try:
+      metrics = parse_metrics(body)
+      check_acl(metrics, queue, properties.user_id)
+      consumer(backend, metrics)
+    except AccessDeniedError, e:
+      syslog.syslog(
+          syslog.LOG_ERR, 'Access to metric denied in %s for %s: %s' % (
+              queue, properties.user_id, e.message))
+    except MalformedMetricError, e:
+      syslog.syslog(
+          syslog.LOG_ERR, 'Failed parsing metric for %s: %s' % (
+              queue, e.message))
+    except Exception, e:
+      syslog.syslog(
+          syslog.LOG_ERR, 'Unable to send metric to %s: %s' % (
+              queue, e.message))
 
   channel.basic_consume(callback, queue=queue, no_ack=True)
   channel.start_consuming()
