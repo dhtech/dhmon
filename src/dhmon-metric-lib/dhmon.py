@@ -32,6 +32,7 @@ class MqBackend(object):
     self.connection = pika.BlockingConnection(
         pika.ConnectionParameters(mq['host'], credentials=credentials))
     self.result_channel = self.connection.channel()
+    self.properties = pika.BasicProperties(user_id=mq['username'])
     self._queue = []
     self._chunk = []
 
@@ -51,10 +52,12 @@ class MqBackend(object):
   def finish(self):
     for chunk in self._queue:
       self.result_channel.basic_publish(
-          exchange='dhmon:metrics', routing_key='', body=chunk)
+          exchange='dhmon:metrics', routing_key='', body=chunk,
+          properties=self.properties)
     if self._chunk:
       self.result_channel.basic_publish(
-          exchange='dhmon:metrics', routing_key='', body=json.dumps(self._chunk))
+          exchange='dhmon:metrics', routing_key='', properties=self.properties,
+          body=json.dumps(self._chunk))
       self._chunk = []
     self._queue = []
 
