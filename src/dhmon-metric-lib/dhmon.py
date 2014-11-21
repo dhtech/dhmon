@@ -55,6 +55,7 @@ class MqBackend(object):
     if self._chunk:
       result_channel.basic_publish(
           exchange='dhmon:metrics', routing_key='', body=json.dumps(self._chunk))
+      self._chunk = []
     result_channel.close()
     self._queue = []
 
