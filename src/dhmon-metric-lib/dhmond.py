@@ -202,6 +202,7 @@ def consume(mq, backend, queue, consumer):
           syslog.LOG_ERR, 'Unable to send metric to %s: %s' % (
               queue, e.message))
 
+  # TODO(bluecmd): Make this error resilient and reconnect on MQ failure
   channel.basic_consume(callback, queue=queue, no_ack=True)
   channel.start_consuming()
 

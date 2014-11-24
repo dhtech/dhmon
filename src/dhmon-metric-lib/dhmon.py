@@ -45,7 +45,7 @@ class MqBackend(object):
         'value': metric.value,
         })
     # Be nice to RabbitMQ, odd problems with larger chunks with wheezy
-    if len(self._chunk) >= 100:
+    if len(self._chunk) >= 10:
       self._queue.append(json.dumps(self._chunk))
       self._chunk = []
 
