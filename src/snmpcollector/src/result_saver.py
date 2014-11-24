@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+import base64
 import logging
 import time
 
@@ -45,6 +46,8 @@ class ResultSaver(stage.Stage):
       value = result.value
       if result.type in self.INTEGER_TYPES:
         value = int(value)
+      else:
+        value = '%s:%s' % (result.type, base64.b64encode(value))
 
       bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
           hostname=target.host, metric='snmp%s' % oid, value=value)
