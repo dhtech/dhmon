@@ -35,6 +35,7 @@ class SnmpWorker(stage.Stage):
       return self.model_oid_cache[cache_key]
 
     oids = set()
+    vlan_aware_oids = set()
     for collection_name, collection in config.get('collection').iteritems():
       for regexp in collection['models']:
         layers = collection.get('layers', None)
@@ -43,9 +44,16 @@ class SnmpWorker(stage.Stage):
         if 'oids' in collection and re.match(regexp, model):
           logging.debug(
               'Model %s matches collection %s', model, collection_name)
-          oids.update(set(collection['oids']))
+          # VLAN aware collections are run against every VLAN.
+          # We don't want to run all the other OIDs (there can be a *lot* of
+          # VLANs).
+          vlan_aware = collection.get('vlan_aware', False)
+          if vlan_aware:
+            vlan_aware_oids.update(set(collection['oids']))
+          else:
+            oids.update(set(collection['oids']))
     self.model_oid_cache[cache_key] = list(oids)
-    return list(oids)
+    return list(oids), list(vlan_aware_oids)
 
   def do_snmp_walk(self, target):
     model = target.model()
@@ -55,15 +63,23 @@ class SnmpWorker(stage.Stage):
       return
 
     logging.debug('Object %s is model %s', target.host, model)
-    oids = self.gather_oids(target, model)
+    global_oids, vlan_oids = self.gather_oids(target, model)
+
+    # 'None' is global (no VLAN aware)
+    vlans = set([None])
+    if vlan_oids:
+      vlans.update(target.vlans())
+
     results = {}
-    for oid in oids:
-      logging.debug('Collecting %s on %s', oid, target.host)
-      if not oid.startswith('.1'):
-        logging.warning(
-            'OID %s does not start with .1, please verify configuration', oid)
-        continue
-      results.update(target.walk(oid))
+    for vlan in list(vlans):
+      oids = vlan_oids if vlan else global_oids
+      for oid in oids:
+        logging.debug('Collecting %s on %s @ %s', oid, target.host, vlan)
+        if not oid.startswith('.1'):
+          logging.warning(
+              'OID %s does not start with .1, please verify configuration', oid)
+          continue
+        results.update(target.walk(oid, vlan))
 
     logging.debug('Done SNMP poll (%d objects) for "%s"',
         len(results.keys()), target.host)

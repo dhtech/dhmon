@@ -90,9 +90,11 @@ class Stage(object):
     args = parser.parse_args()
 
     if args.debug:
-      root.setLevel(logging.INFO)
+      root.setLevel(logging.DEBUG)
       ch = logging.StreamHandler(sys.stdout)
-      ch.setLevel(logging.INFO)
+      ch.setLevel(logging.DEBUG)
+      logging.getLogger('pika').setLevel(logging.ERROR)
+
       formatter = logging.Formatter( '%(asctime)s - %(name)s - '
           '%(levelname)s - %(message)s' )
       ch.setFormatter(formatter)

@@ -1,1 +1,13 @@
+
+# Dependencies
+
 Use libsnmp30 and python-netsnmp (required for SNMPv3)
+
+Use python-pika >= 0.9.14 (weird framing error otherwise)
+
+
+# Management
+
+Selective restart:
+sudo LIMITRESTART=worker /etc/init.d/dhmon-snmpcollector restart
+

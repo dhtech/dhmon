@@ -32,6 +32,10 @@ stage() {
     return
   fi
 
+  if [[ ! -z "${LIMITRESTART}" ]] && [[ "${LIMITRESTART}" != "${name}" ]]; then
+    return
+  fi
+
   if [[ "$action" == "start" ]]; then
     log_daemon_msg "Starting dhmon snmpcollector $name"
   elif [[ "$action" == "stop" ]]; then

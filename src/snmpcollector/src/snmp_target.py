@@ -34,30 +34,34 @@ class SnmpTarget(object):
     self.priv=priv
     self.sec_level=sec_level
 
-  def _snmp_session(self, timeout=1000000, retries=3):
+  def _snmp_session(self, vlan=None, timeout=1000000, retries=3):
     if self.version == 3:
+      context = ('vlan-%s' % vlan) if vlan else ''
       return netsnmp.Session(Version=3, DestHost=self._full_host,
-        SecName=self.user, SecLevel=self.sec_level,
+        SecName=self.user, SecLevel=self.sec_level, Context=context,
         AuthProto=self.auth_proto, AuthPass=self.auth,
         PrivProto=self.priv_proto, PrivPass=self.priv,
         UseNumeric=1, Timeout=timeout, Retries=retries)
     else:
+      community = ('%s@%s' % (self.community, vlan)) if vlan else self.community
       return netsnmp.Session(Version=self.version, DestHost=self._full_host,
-          Community=self.community, UseNumeric=1, Timeout=timeout,
+          Community=community, UseNumeric=1, Timeout=timeout,
           Retries=retries)
 
-  def walk(self, oid):
-    sess = self._snmp_session()
+  def walk(self, oid, vlan=None):
+    sess = self._snmp_session(vlan)
     ret = {}
     nextoid = oid
     offset = 0
+
+    suffix = ('@%s' % vlan) if vlan else ''
+
     # Abort the walk when it exits the OID tree we are interested in
     while nextoid.startswith(oid):
       var_list = netsnmp.VarList(netsnmp.Varbind(nextoid, offset))
-      # TODO(bluecmd): We want this to fail *much* faster, not ~5 sec as is now
       sess.getbulk(nonrepeaters=0, maxrepetitions=256, varlist=var_list)
       for result in var_list:
-        ret['%s.%s' % (result.tag, int(result.iid))] = ResultTuple(
+        ret['%s.%s%s' % (result.tag, int(result.iid), suffix)] = ResultTuple(
             result.val, result.type)
       # Continue bulk walk
       offset = int(var_list[-1].iid)
