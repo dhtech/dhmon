@@ -21,6 +21,7 @@ class SnmpTarget(object):
       sec_level=None,
       port=161):
     self._full_host = "%s:%s" % (ip, port)
+    self._max_size = 256
     self.host=host
     self.ip=ip
     self.timestamp=timestamp
@@ -59,7 +60,19 @@ class SnmpTarget(object):
     # Abort the walk when it exits the OID tree we are interested in
     while nextoid.startswith(oid):
       var_list = netsnmp.VarList(netsnmp.Varbind(nextoid, offset))
-      sess.getbulk(nonrepeaters=0, maxrepetitions=256, varlist=var_list)
+      sess.getbulk(nonrepeaters=0, maxrepetitions=self._max_size,
+                   varlist=var_list)
+
+      # WORKAROUND FOR NEXUS BUG (2014-11-24)
+      # Indy told blueCmd that Nexus silently drops the SNMP response
+      # if the packet is fragmented. Try with large size first, but drop down
+      # to smaller one.
+      if sess.ErrorStr == 'Timeout':
+        if self._max_size == 1:
+          raise TimeoutError()
+        self._max_size = int(self._max_size / 16)
+        continue
+
       for result in var_list:
         ret['%s.%s%s' % (result.tag, int(result.iid), suffix)] = ResultTuple(
             result.val, result.type)
@@ -80,15 +93,21 @@ class SnmpTarget(object):
 
   def model(self):
     try:
-      model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1')
-      if not model or not model.values().pop().value:
-        model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1001')
-      if not model:
-        return None
-      return model.values().pop().value
+      model_oids = [
+          '.1.3.6.1.2.1.47.1.1.1.1.13.1',     # Normal switches
+          '.1.3.6.1.2.1.47.1.1.1.1.13.1001',  # Stacked switches
+          '.1.3.6.1.2.1.47.1.1.1.1.13.10',    # Nexus
+      ]
+      for oid in model_oids:
+        model = self.get(oid)
+        if not model:
+          continue
+        value = model.values().pop().value
+        if value:
+          return value
     except TimeoutError:
       logging.info('Timeout getting model for %s', self.host)
-      return None
+    return None
 
   def vlans(self):
     try:
