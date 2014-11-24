@@ -39,8 +39,7 @@ class Stage(object):
     self.connection = None
 
   def startup(self):
-    config.load('/etc/snmpcollector.yaml')
-    mq = config.config['mq']
+    mq = config.get('mq')
     credentials = pika.PlainCredentials(mq['username'], mq['password'])
     self.connection = pika.BlockingConnection(
         pika.ConnectionParameters(mq['host'], credentials=credentials))

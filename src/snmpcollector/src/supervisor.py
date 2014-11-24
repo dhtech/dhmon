@@ -28,12 +28,13 @@ class Supervisor(stage.Stage):
         "WHERE o.name = 'layer' AND h.node_id = o.node_id")
     nodes = {}
     for host, ip, layer in cursor.execute(sql).fetchall():
-      layer_config = config.config['snmp'].get(layer, None)
+      layer_config = config.get('snmp', layer)
       if layer_config is None:
         logging.error('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
         continue
-      yield host, snmp_target.SnmpTarget(host, ip, timestamp, **layer_config)
+      yield host, snmp_target.SnmpTarget(host, ip, timestamp, layer,
+                                         **layer_config)
 
   def do_trigger(self):
     timestamp = time.time()

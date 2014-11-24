@@ -4,14 +4,12 @@ import sqlite3
 import sys
 import time
 
-import config
 import supervisor
 import snmp_worker
 
 
 logging.basicConfig(level=logging.DEBUG)
 
-config.load('/etc/snmpcollector.yaml')
 supervisor_stage = supervisor.Supervisor()
 worker_stage = snmp_worker.SnmpWorker()
 

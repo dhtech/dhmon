@@ -22,21 +22,29 @@ class SnmpWorker(stage.Stage):
 
   def __init__(self):
     self.model_oid_cache = {}
+    self.model_oid_cache_incarnation = 0
     super(SnmpWorker, self).__init__(
         'snmp_worker', task_queue='supervisor', result_queue='worker')
 
-  def _gather_oids(self, model):
-    if model in self.model_oid_cache:
-      return self.model_oid_cache[model]
+  def gather_oids(self, target, model):
+    if config.incarnation != self.model_oid_cache_incarnation:
+      self.model_oid_cache = {}
+
+    cache_key = (target.layer, model)
+    if cache_key in self.model_oid_cache:
+      return self.model_oid_cache[cache_key]
 
     oids = set()
-    for collection_name, collection in config.config['collection'].iteritems():
+    for collection_name, collection in config.get('collection').iteritems():
       for regexp in collection['models']:
+        layers = collection.get('layers', None)
+        if layers and target.layer not in layers:
+          continue
         if 'oids' in collection and re.match(regexp, model):
           logging.debug(
               'Model %s matches collection %s', model, collection_name)
           oids.update(set(collection['oids']))
-    self.model_oid_cache[model] = list(oids)
+    self.model_oid_cache[cache_key] = list(oids)
     return list(oids)
 
   def do_snmp_walk(self, target):
@@ -47,10 +55,14 @@ class SnmpWorker(stage.Stage):
       return
 
     logging.debug('Object %s is model %s', target.host, model)
-    oids = self._gather_oids(model)
+    oids = self.gather_oids(target, model)
     results = {}
     for oid in oids:
       logging.debug('Collecting %s on %s', oid, target.host)
+      if not oid.startswith('.1'):
+        logging.warning(
+            'OID %s does not start with .1, please verify configuration', oid)
+        continue
       results.update(target.walk(oid))
 
     logging.debug('Done SNMP poll (%d objects) for "%s"',

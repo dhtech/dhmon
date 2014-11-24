@@ -16,13 +16,15 @@ class TimeoutError(Error):
 
 class SnmpTarget(object):
 
-  def __init__(self, host, ip, timestamp, version, community=None, user=None,
-      auth_proto=None, auth=None, priv_proto=None, priv=None, sec_level=None,
+  def __init__(self, host, ip, timestamp, layer, version, community=None,
+      user=None, auth_proto=None, auth=None, priv_proto=None, priv=None,
+      sec_level=None,
       port=161):
     self._full_host = "%s:%s" % (ip, port)
     self.host=host
     self.ip=ip
     self.timestamp=timestamp
+    self.layer=layer
     self.version=version
     self.community=community
     self.user=user
