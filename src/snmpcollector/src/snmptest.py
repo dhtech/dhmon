@@ -23,7 +23,12 @@ if not target:
   print 'Target not found'
   exit(1)
 
-print 'Target model:', target.model()
+model = target.model()
+if not model:
+  print 'Unable to fetch model, please check connectivity and configuration'
+  exit(1)
+
+print 'Target model:', model
 
 for action in worker_stage.do_snmp_walk(target):
   for key in sorted(action.results.keys()):

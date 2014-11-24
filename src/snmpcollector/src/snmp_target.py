@@ -1,8 +1,17 @@
 import collections
+import logging
 import netsnmp
 
 
 ResultTuple = collections.namedtuple('ResultTuple', ['value', 'type'])
+
+
+class Error(Exception):
+  """Base error class for this module."""
+
+
+class TimeoutError(Error):
+  """Timeout talking to the device."""
 
 
 class SnmpTarget(object):
@@ -23,16 +32,17 @@ class SnmpTarget(object):
     self.priv=priv
     self.sec_level=sec_level
 
-  def _snmp_session(self):
+  def _snmp_session(self, timeout=1000000, retries=3):
     if self.version == 3:
       return netsnmp.Session(Version=3, DestHost=self._full_host,
         SecName=self.user, SecLevel=self.sec_level,
         AuthProto=self.auth_proto, AuthPass=self.auth,
         PrivProto=self.priv_proto, PrivPass=self.priv,
-        UseNumeric=1)
+        UseNumeric=1, Timeout=timeout, Retries=retries)
     else:
       return netsnmp.Session(Version=self.version, DestHost=self._full_host,
-          Community=self.community, UseNumeric=1)
+          Community=self.community, UseNumeric=1, Timeout=timeout,
+          Retries=retries)
 
   def walk(self, oid):
     sess = self._snmp_session()
@@ -55,14 +65,21 @@ class SnmpTarget(object):
   def get(self, oid):
     var = netsnmp.Varbind(oid)
     var_list = netsnmp.VarList(var)
-    sess = self._snmp_session()
+    sess = self._snmp_session(timeout=500000, retries=2)
     sess.get(var_list)
+    if sess.ErrorStr == 'Timeout':
+      raise TimeoutError()
+
     return {var.tag: ResultTuple(var.val, var.type)}
 
   def model(self):
-    model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1')
-    if not model or not model.values().pop().value:
-      model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1001')
-    if not model:
+    try:
+      model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1')
+      if not model or not model.values().pop().value:
+        model = self.get('.1.3.6.1.2.1.47.1.1.1.1.13.1001')
+      if not model:
+        return None
+      return model.values().pop().value
+    except TimeoutError:
+      logging.info('Timeout getting model for %s', self.host)
       return None
-    return model.values().pop().value
