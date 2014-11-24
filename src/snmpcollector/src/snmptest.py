@@ -28,6 +28,8 @@ if not model:
 
 print 'Target model:', model
 
+print 'Target VLANs:', target.vlans()
+
 for action in worker_stage.do_snmp_walk(target):
   for key in sorted(action.results.keys()):
     print key, action.results[key]
