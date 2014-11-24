@@ -27,7 +27,6 @@ def ping(ips):
 
   # Send this in chunks, it makes RabbitMQ happier and it's faster
   for chunk in (ips[x:x+100] for x in xrange(0, len(ips), 100)):
-    print chunk
     channel.basic_publish(
         exchange='', routing_key=request_queue, body=json.dumps(chunk),
         properties=pika.BasicProperties(expiration='1000'))
@@ -77,5 +76,5 @@ def receive(timeout=None):
 
 if __name__ == '__main__':
   ping(sys.argv[1:])
-  for ip, secs, usecs in receive(1):
+  for ip, secs, usecs in receive(10):
     print 'Reply:', ip, (secs*1000.0 + usecs / 1000.0)
