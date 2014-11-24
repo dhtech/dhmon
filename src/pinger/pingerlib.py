@@ -24,9 +24,13 @@ def ping(ips):
   connection = connect()
   channel = connection.channel()
   request_queue = 'dhmon:pinger:req:%s' % socket.getfqdn()
-  channel.basic_publish(
-      exchange='', routing_key=request_queue, body=json.dumps(ips),
-      properties=pika.BasicProperties(expiration='1000'))
+
+  # Send this in chunks, it makes RabbitMQ happier and it's faster
+  for chunk in (ips[x:x+100] for x in xrange(0, len(ips), 100)):
+    print chunk
+    channel.basic_publish(
+        exchange='', routing_key=request_queue, body=json.dumps(chunk),
+        properties=pika.BasicProperties(expiration='1000'))
 
 
 def _receive_thread(queue, timeout):
