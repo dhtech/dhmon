@@ -21,19 +21,19 @@ class Supervisor(stage.Stage):
     super(Supervisor, self).__init__(
         'supervisor', task_queue='trigger', result_queue='supervisor')
 
-  def _construct_targets(self, timestamp):
+  def construct_targets(self, timestamp):
     db = sqlite3.connect('/etc/ipplan.db')
     cursor = db.cursor()
-    sql = ("SELECT h.name, o.value FROM host h, option o WHERE o.name = 'layer'"
-        "AND h.node_id = o.node_id")
+    sql = ("SELECT h.name, h.ipv4_addr_txt, o.value FROM host h, option o "
+        "WHERE o.name = 'layer' AND h.node_id = o.node_id")
     nodes = {}
-    for host, layer in cursor.execute(sql).fetchall():
+    for host, ip, layer in cursor.execute(sql).fetchall():
       layer_config = config.config['snmp'].get(layer, None)
       if layer_config is None:
         logging.error('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
         continue
-      yield host, snmp_target.SnmpTarget(host, timestamp, **layer_config)
+      yield host, snmp_target.SnmpTarget(host, ip, timestamp, **layer_config)
 
   def do_trigger(self):
     timestamp = time.time()
@@ -41,7 +41,7 @@ class Supervisor(stage.Stage):
     #measure_runtime = stage.MeasureToken(name="runtime", blocker=True)
     #measure_congestion = stage.MeasureToken(name="congestion", blocker=False)
 
-    for host, target in self._construct_targets(timestamp):
+    for host, target in self.construct_targets(timestamp):
       yield snmp_worker.SnmpWalkAction(target)
 
     logging.info('New work pushed')

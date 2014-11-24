@@ -7,11 +7,12 @@ ResultTuple = collections.namedtuple('ResultTuple', ['value', 'type'])
 
 class SnmpTarget(object):
 
-  def __init__(self, host, timestamp, version, community=None, user=None,
+  def __init__(self, host, ip, timestamp, version, community=None, user=None,
       auth_proto=None, auth=None, priv_proto=None, priv=None, sec_level=None,
       port=161):
-    self._full_host = "%s:%s" % (host, port)
+    self._full_host = "%s:%s" % (ip, port)
     self.host=host
+    self.ip=ip
     self.timestamp=timestamp
     self.version=version
     self.community=community
@@ -41,6 +42,7 @@ class SnmpTarget(object):
     # Abort the walk when it exits the OID tree we are interested in
     while nextoid.startswith(oid):
       var_list = netsnmp.VarList(netsnmp.Varbind(nextoid, offset))
+      # TODO(bluecmd): We want this to fail *much* faster, not ~5 sec as is now
       sess.getbulk(nonrepeaters=0, maxrepetitions=256, varlist=var_list)
       for result in var_list:
         ret['%s.%s' % (result.tag, int(result.iid))] = ResultTuple(

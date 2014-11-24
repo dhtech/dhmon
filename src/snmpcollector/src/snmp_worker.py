@@ -33,8 +33,9 @@ class SnmpWorker(stage.Stage):
     for collection_name, collection in config.config['collection'].iteritems():
       for regexp in collection['models']:
         if 'oids' in collection and re.match(regexp, model):
+          logging.debug(
+              'Model %s matches collection %s', model, collection_name)
           oids.update(set(collection['oids']))
-          break
     self.model_oid_cache[model] = list(oids)
     return list(oids)
 

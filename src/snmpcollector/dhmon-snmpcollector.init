@@ -2,8 +2,8 @@
 
 ### BEGIN INIT INFO
 # Provides:        dhmon-snmpcollector
-# Required-Start:  $network $remote_fs $syslog influxdb
-# Required-Stop:   $network $remote_fs $syslog influxdb
+# Required-Start:  $network $remote_fs $syslog
+# Required-Stop:   $network $remote_fs $syslog
 # Default-Start:   2 3 4 5
 # Default-Stop: 
 # Short-Description: Start dhmon snmpcollector
