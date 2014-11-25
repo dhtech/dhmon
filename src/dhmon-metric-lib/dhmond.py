@@ -31,6 +31,8 @@ MEMCACHE_TTL = 3600
 redis_metric_time = {}
 influxdb_metric_time = {}
 
+memcache_metrics = ['ipplan-pinger.us']
+
 
 class Error(Exception):
   """Base exception for this module."""
@@ -169,6 +171,12 @@ def influxdb_consume(backend, metrics):
 
 def memcache_consume(backend, metrics):
   for metric in metrics:
+    # TODO(bluecmd): Replace with topics instead
+    for part in memcache_metrics:
+      if part in metric['metric']:
+        break
+    else:
+       continue
     key = 'last:%s.%s' % (metric['host'], metric['metric'])
     backend.set(str(key), json.dumps(metric), time=MEMCACHE_TTL)
 
