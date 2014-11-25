@@ -14,6 +14,14 @@ class TimeoutError(Error):
   """Timeout talking to the device."""
 
 
+class NoModelOid(Error):
+  """Could not locate a model for the switch."""
+
+
+class SnmpError(Error):
+  """A SNMP error occurred."""
+
+
 class SnmpTarget(object):
 
   def __init__(self, host, ip, timestamp, layer, version, community=None,
@@ -69,9 +77,13 @@ class SnmpTarget(object):
       # to smaller one.
       if sess.ErrorStr == 'Timeout':
         if self._max_size == 1:
-          raise TimeoutError()
+          raise TimeoutError(
+              'Timeout getting %s from %s' % (nextoid, self.host))
         self._max_size = int(self._max_size / 16)
         continue
+      if sess.ErrorStr != '':
+        raise SnmpError('SNMP error while walking host %s: %s' % (
+          self.host, sess.ErrorStr))
 
       for result in var_list:
         ret['%s.%s%s' % (result.tag, int(result.iid), suffix)] = ResultTuple(
@@ -86,28 +98,28 @@ class SnmpTarget(object):
     var_list = netsnmp.VarList(var)
     sess = self._snmp_session(timeout=500000, retries=2)
     sess.get(var_list)
-    if sess.ErrorStr == 'Timeout':
-      raise TimeoutError()
+    if sess.ErrorStr != '':
+      if sess.ErrorStr == 'Timeout':
+        raise TimeoutError('Timeout getting %s from %s' % (oid, self.host))
+      raise SnmpError('SNMP error while talking to host %s: %s' % (
+        self.host, sess.ErrorStr))
 
     return {var.tag: ResultTuple(var.val, var.type)}
 
   def model(self):
-    try:
-      model_oids = [
-          '.1.3.6.1.2.1.47.1.1.1.1.13.1',     # Normal switches
-          '.1.3.6.1.2.1.47.1.1.1.1.13.1001',  # Stacked switches
-          '.1.3.6.1.2.1.47.1.1.1.1.13.10',    # Nexus
-      ]
-      for oid in model_oids:
-        model = self.get(oid)
-        if not model:
-          continue
-        value = model.values().pop().value
-        if value:
-          return value
-    except TimeoutError:
-      logging.info('Timeout getting model for %s', self.host)
-    return None
+    model_oids = [
+        '.1.3.6.1.2.1.47.1.1.1.1.13.1',     # Normal switches
+        '.1.3.6.1.2.1.47.1.1.1.1.13.1001',  # Stacked switches
+        '.1.3.6.1.2.1.47.1.1.1.1.13.10',    # Nexus
+    ]
+    for oid in model_oids:
+      model = self.get(oid)
+      if not model:
+        continue
+      value = model.values().pop().value
+      if value:
+        return value
+    raise NoModelOid('No model OID contained a model')
 
   def vlans(self):
     try:

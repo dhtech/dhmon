@@ -1,5 +1,6 @@
 import abc
 import argparse
+import dhmon
 import logging
 import logging.handlers
 import os
@@ -49,7 +50,14 @@ class Stage(object):
 
   def shutdown(self):
     logging.info('Terminating %s', self.name)
+    if self.result_channel:
+      self.result_channel.close()
+      self.result_channel = None
+    if self.task_channel:
+      self.task_channel.close()
+      self.task_channel = None
     self.connection.close()
+    self.connection = None
 
   def push(self, action, expire=None):
     if not self.result_channel:
@@ -60,6 +68,15 @@ class Stage(object):
         exchange='', routing_key=self.result_queue,
         body=pickle.dumps(action, protocol=pickle.HIGHEST_PROTOCOL),
         properties=properties)
+
+  def _task_wrapper_callback(self, channel, method, properties, body):
+    try:
+      self._task_callback(channel, method, properties, body)
+    except Exception, e:
+      dhmon.metric(
+          'snmpcollector.task.exceptions.str', str(e), hostname=self.name)
+      logging.exception('Unhandled exception in task loop:')
+      raise
 
   def _task_callback(self, channel, method, properties, body):
     action = pickle.loads(body)
@@ -123,18 +140,28 @@ class Stage(object):
     with open(pidfile, 'w') as f:
       f.write(str(os.getpid()))
 
-    self.startup()
+    # On error, restart this thread
+    running = True
+    while running:
+      self.startup()
 
-    self.task_channel = self.connection.channel()
-    self.task_channel.queue_declare(queue=self.task_queue)
-    self.task_channel.basic_qos(prefetch_count=1)
+      self.task_channel = self.connection.channel()
+      self.task_channel.queue_declare(queue=self.task_queue)
+      self.task_channel.basic_qos(prefetch_count=1)
 
-    if purge_task_queue:
-      self.task_channel.queue_purge(queue=self.task_queue)
+      if purge_task_queue:
+        self.task_channel.queue_purge(queue=self.task_queue)
 
-    self.task_channel.basic_consume(self._task_callback, queue=self.task_queue)
-    try:
-      self.task_channel.start_consuming()
-    except KeyboardInterrupt:
-      logging.error('Keyboard interrupt, shutting down..')
-    self.shutdown()
+      self.task_channel.basic_consume(
+          self._task_wrapper_callback, queue=self.task_queue)
+      try:
+        self.task_channel.start_consuming()
+      except KeyboardInterrupt:
+        logging.error('Keyboard interrupt, shutting down..')
+        running = False
+      except Exception:
+        dhmon.metric(
+            'snmpcollector.loop.exceptions.str', str(e), hostname=self.name)
+        logging.exception('Unhandled exception, restarting stage')
+
+      self.shutdown()

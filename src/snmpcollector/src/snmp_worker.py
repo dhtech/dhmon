@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+import dhmon
 import logging
 import re
 
@@ -56,10 +57,15 @@ class SnmpWorker(stage.Stage):
     return list(oids), list(vlan_aware_oids)
 
   def do_snmp_walk(self, target):
-    model = target.model()
+    try:
+      model = target.model()
+    except snmp_target.Error, e:
+      dhmon.metric('snmpcollector.no-model.str', value=str(e),
+                   hostname=target.host)
+      return
     if not model:
-      # TODO(bluecmd): Log this failure to a metric
-      logging.info('Unable to collect from %s, cannot get model', target.host)
+      # TODO(bluecmd): Replace with events in 2.0?
+      dhmon.metric('snmpcollector.no-model.str', value='', hostname=target.host)
       return
 
     logging.debug('Object %s is model %s', target.host, model)
@@ -67,8 +73,13 @@ class SnmpWorker(stage.Stage):
 
     # 'None' is global (no VLAN aware)
     vlans = set([None])
-    if vlan_oids:
-      vlans.update(target.vlans())
+    try:
+      if vlan_oids:
+        vlans.update(target.vlans())
+    except snmp_target.Error, e:
+      dhmon.metric('snmpcollector.errors.str', value=str(e),
+                   hostname=target.host)
+      logging.warning('Could not list VLANs: %s', str(e))
 
     results = {}
     for vlan in list(vlans):
@@ -79,7 +90,22 @@ class SnmpWorker(stage.Stage):
           logging.warning(
               'OID %s does not start with .1, please verify configuration', oid)
           continue
-        results.update(target.walk(oid, vlan))
+        try:
+          results.update(target.walk(oid, vlan))
+        except snmp_target.TimeoutError, e:
+          dhmon.metric(
+              'snmpcollector.timeout.%s.str' % ('vlan' if vlan else 'global', ),
+              str(e), hostname=target.host)
+          if vlan:
+            logging.debug(
+                'Timeout, is switch configured for VLAN SNMP context? %s', e)
+          else:
+            logging.debug('Timeout, slow switch? %s', e)
+        except snmp_target.Error, e:
+          dhmon.metric('snmpcollector.errors.str', value=str(e),
+                       hostname=target.host)
+          logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
+ 
 
     logging.debug('Done SNMP poll (%d objects) for "%s"',
         len(results.keys()), target.host)
