@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import collections
 import json
+import logging
 import memcache
 import os
 import pika
@@ -13,16 +14,13 @@ import time
 import yaml
 
 # Remove older entries than this (seconds)
-REDIS_TIMEOUT = 3600 * 1000
-
-# Use this timeout for metric grouped collection
-REDIS_SHORT_TIMEOUT = 60 * 1000
+REDIS_TIMEOUT = 60 * 10 * 1000
 
 # How often to run the cleanup command
-REDIS_CLEAN_INTERVAL = 60 * 5
+REDIS_CLEAN_INTERVAL = 60 * 10
 
 # Be gentle to slow backends, we use memcache for low-latency stuff
-REDIS_HOLDOFF = 30 * 1000
+REDIS_HOLDOFF = 160 * 1000
 INFLUXDB_HOLDOFF = 14 * 1000
 
 # Memcache expiry setting on entries (seconds)
@@ -113,8 +111,9 @@ def check_acl(metrics, queue, user):
   """Make sure that the given user is allowed to post metrics to a backend."""
   if not user:
     raise AccessDeniedError('No user supplied')
-  if user == 'external':
-    raise AccessDeniedError('User is denied')
+  if user == 'dhmon':
+    return
+  raise AccessDeniedError('User is denied')
 
 
 def is_holdoff(metric_time, metric, holdoff):
@@ -153,12 +152,7 @@ def redis_clean():
   while True:
     timestamp = int(time.time() * 1000)
     for key in backend.keys():
-      if key.startswith('metric:') or key.startswith('host:'):
-        backend.zremrangebyscore(key, 0, timestamp - REDIS_SHORT_TIMEOUT)
-      elif key.startswith('last:'):
-        continue
-      else:
-        backend.zremrangebyscore(key, 0, timestamp - REDIS_TIMEOUT)
+      backend.zremrangebyscore(key, 0, timestamp - REDIS_TIMEOUT)
     elapsed = int(time.time() * 1000) - timestamp
     syslog.syslog(syslog.LOG_INFO, 'Redis cleaner is done, it took %d ms' % (
         elapsed))
@@ -188,6 +182,7 @@ def consume(mq, backend, queue, consumer):
     try:
       metrics = parse_metrics(body)
       check_acl(metrics, queue, properties.user_id)
+      logging.debug('Consumed %d metrics for %s', len(metrics), backend)
       consumer(backend, metrics)
     except AccessDeniedError, e:
       syslog.syslog(
