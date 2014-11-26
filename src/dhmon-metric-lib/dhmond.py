@@ -136,12 +136,27 @@ def redis_consume(backend, metrics):
   for metric in metrics:
     if is_holdoff(redis_metric_time, metric, REDIS_HOLDOFF):
       continue
+
+    # Ignore SNMP elapsed metrics
+    # TODO(bluecmd): Make this configurable
+    if metric['metric'].startswith('snmp.elapsed'):
+      continue
+
     timestamp = int(metric['time']) * 1000
-    backend.zadd('metric:' + metric['metric'], timestamp, json.dumps({
+
+    key = metric['metric']
+    metric_struct = {
         'host': metric['host'],
         'prober': metric['prober'],
         'value': metric['value']
-    }))
+    }
+    if metric['metric'].startswith('snmp.1'):
+      # for SNMP do a special thing for redis where we set last oid as a special attribute
+      parts = key.split('.')
+      metric_struct['lastoid'] = parts[-1]
+      key = '.'.join(key.split('.')[:-1])
+      
+    backend.zadd('metric:' + key, timestamp, json.dumps(metric_struct))
     backend.zadd('host:' + metric['host'], timestamp, json.dumps({
         'metric': metric['metric'],
         'prober': metric['prober'],
