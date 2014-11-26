@@ -57,6 +57,51 @@ var snmpErrors = function(callback) {
   });
 };
 
+function snmpMetricToDict(data) {
+  dict = {};
+  for ( var i = 0; i < data.length; i++ ) {
+    var entry = JSON.parse(data[i]);
+    dict[entry['host'] + '@' + entry['lastoid']] = entry['value'];
+  }
+  return dict;
+}
+
+function decodeSnmpValue(raw) {
+  var idx = raw.indexOf(':');
+  return raw.substring(idx+1);
+}
+
+function assembleInventory(sn, model, alias) {
+
+  sns = snmpMetricToDict(sn);
+  models = snmpMetricToDict(model);
+  aliases = snmpMetricToDict(alias);
+
+  inventory = {};
+  for (oid in sns) {
+    inventory[oid] = {
+      'sn': decodeSnmpValue(sns[oid]),
+      'model': decodeSnmpValue(models[oid]),
+      'alias': decodeSnmpValue(aliases[oid])
+    };
+  }
+
+  return inventory;
+}
+
+var inventory = function(callback) {
+  db.zrange('metric:snmp.1.3.6.1.2.1.47.1.1.1.1.11', 0, -1,
+      function(err, sn_data) {
+        db.zrange('metric:snmp.1.3.6.1.2.1.47.1.1.1.1.13', 0, -1,
+          function(err, model_data) {
+            db.zrange('metric:snmp.1.3.6.1.2.1.47.1.1.1.1.2', 0, -1,
+              function(err, alias_data) {
+                callback(assembleInventory(sn_data, model_data, alias_data));
+              });
+          });
+      });
+};
+
 var documentation = function() {
   html = "<h1>Available Calls</h1>";
   for ( path in paths ) {
@@ -75,6 +120,10 @@ var paths = {
   "snmp.errors": {
     "method": snmpErrors,
     "what": "List of all recent SNMP collection errors"
+  },
+  "inventory": {
+    "method": inventory,
+    "what": "List of all inventory information"
   }
 };
 
