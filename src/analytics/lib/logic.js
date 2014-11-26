@@ -9,7 +9,7 @@ var db = redis.createClient(config.redis.port, config.redis.host);
 
 // Connect to Memcache
 var Memcached = require('memcached');
-var memcached = new Memcached('localhost:11211');
+var memcached = new Memcached('dhmon.event.dreamhack.se:11211');
 
 var switchesStatus = function(callback) {
   db.zrange('metric:ipplan-pinger.us', 0, -1, 'withscores',
@@ -44,8 +44,21 @@ var switchesStatus = function(callback) {
   });
 };
 
+var snmpErrors = function(callback) {
+  db.zrange('metric:snmpcollector.no-model.str', 0, -1, 'withscores',
+            function(err, data) {
+    var hosts = {};
+    for ( var i = 0; i < data.length; i+=2 ) {
+      var entry = JSON.parse(data[i]);
+      var last_beat = ((new Date().getTime()) - data[i+1])/1000;
+      hosts[entry['host']] = {'error': entry['value'], 'since': last_beat};
+    }
+    callback(hosts);
+  });
+};
+
 var documentation = function() {
-  html = "<h1>Avaiable Calls</h1>";
+  html = "<h1>Available Calls</h1>";
   for ( path in paths ) {
     url = path.replace(".", "/", path);
     html += util.format("<h2>%s</h2><pre>GET /%s</pre><span>%s</span>",
@@ -58,6 +71,10 @@ var paths = {
   "switches.status": {
     "method": switchesStatus,
     "what": "Status of all switched currently being polled"
+  },
+  "snmp.errors": {
+    "method": snmpErrors,
+    "what": "List of all recent SNMP collection errors"
   }
 };
 
