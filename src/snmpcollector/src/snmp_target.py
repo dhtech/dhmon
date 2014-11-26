@@ -86,8 +86,12 @@ class SnmpTarget(object):
           self.host, sess.ErrorStr))
 
       for result in var_list:
-        ret['%s.%s%s' % (result.tag, int(result.iid), suffix)] = ResultTuple(
-            result.val, result.type)
+        currentoid = '%s.%s' % (result.tag, int(result.iid))
+        # We don't want to save extra oids that the bulk walk might have
+        # contained.
+        if not currentoid.startswith(oid):
+          break
+        ret[currentoid + suffix] = ResultTuple(result.val, result.type)
       # Continue bulk walk
       offset = int(var_list[-1].iid)
       nextoid = var_list[-1].tag
