@@ -25,37 +25,39 @@ def connect():
 
 
 def transmit_thread(sockfd):
-  channel = connect()
-  queue = 'dhmon:pinger:req:%s' % socket.getfqdn()
-  channel.queue_declare(queue=queue, auto_delete=True)
+  while True:
+    channel = connect()
+    queue = 'dhmon:pinger:req:%s' % socket.getfqdn()
+    channel.queue_declare(queue=queue, auto_delete=True)
 
-  def consume(channel, method, properties, body):
+    def consume(channel, method, properties, body):
+      try:
+        for ip in json.loads(body):
+          dhmonpinger.transmit(sockfd, ip)
+      except Exception, e:
+        syslog.syslog(syslog.LOG_ERR, 'Got order to ping "%s", failed: %s' % (
+            body, str(e)))
+
     try:
-      for ip in json.loads(body):
-        dhmonpinger.transmit(sockfd, ip)
+      channel.basic_consume(consume, queue=queue, no_ack=True)
+      channel.start_consuming()
     except Exception, e:
-      syslog.syslog(syslog.LOG_ERR, 'Got order to ping "%s", failed: %s' % (
-          body, str(e)))
-
-  try:
-    channel.basic_consume(consume, queue=queue, no_ack=True)
-    channel.start_consuming()
-  except Exception, e:
-    syslog.syslog(syslog.LOG_ERR, 'INTERNAL ERROR in pinger: %s' % str(e))
+      syslog.syslog(syslog.LOG_ERR, 'INTERNAL ERROR in pinger: %s' % str(e))
 
 
 def receive_thread(sockfd):
-  channel = connect()
-  queue = 'dhmon:pinger:resp:%s' % socket.getfqdn()
-  channel.queue_declare(queue=queue)
+  while True:
+    channel = connect()
+    queue = 'dhmon:pinger:resp:%s' % socket.getfqdn()
+    channel.queue_declare(queue=queue)
 
-  try:
-    while True:
-      ret = dhmonpinger.receive(sockfd)
-      channel.basic_publish(
-          exchange='', routing_key=queue, body=json.dumps(ret))
-  except Exception, e:
-    syslog.syslog(syslog.LOG_ERR, 'Failed to receive ping: %s' % e)
+    try:
+      while True:
+        ret = dhmonpinger.receive(sockfd)
+        channel.basic_publish(
+            exchange='', routing_key=queue, body=json.dumps(ret))
+    except Exception, e:
+      syslog.syslog(syslog.LOG_ERR, 'Failed to receive ping: %s' % e)
 
 
 def main():
