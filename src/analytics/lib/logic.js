@@ -74,6 +74,42 @@ function redisMetricToDict(key, property, callback) {
   });
 }
 
+var switchInterfaces = function(callback) {
+  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.2', 0, -1, function(err, data) {
+    var ifaces = {};
+    for ( var i = 0; i < data.length; i++ ) {
+      var entry = JSON.parse(data[i]);
+      ifaces[entry.host+'@'+entry.lastoid] = entry.value;
+    }
+    db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.8', 0, -1,
+      function(err, data) {
+      var iface_status = {};
+      for ( var i = 0; i < data.length; i++ ) {
+        var entry = JSON.parse(data[i]);
+        iface_status[entry.host+'@'+entry.lastoid] = entry.value;
+      }
+      db.zrange('metric:snmp.1.3.6.1.2.1.31.1.1.1.15', 0, -1, 'withscores',
+        function(err, speed) {
+        var switches = {};
+        for ( var i = 0; i < speed.length; i+=2 ) {
+          var entry = JSON.parse(speed[i]);
+          if (!switches.hasOwnProperty(entry.host)) {
+            switches[entry.host] = [];
+          }
+          var iface = ifaces[entry.host+'@'+entry.lastoid];
+          var statusnum = iface_status[entry.host+'@'+entry.lastoid];
+          var ifacestat = statusnum == '1' ? 'up' : 'down';
+          var last_beat = ((new Date().getTime()) - speed[i+1])/1000;
+          switches[entry.host].push(
+            {'interface': iface, 'since': last_beat, 'speed': entry.value,
+             'status': ifacestat});
+        }
+        callback(switches);
+      });
+    });
+  });
+};
+
 var rancidStatus = function(callback) {
   db.zrange('metric:rancid.size', 0, -1, function(err, data) {
     var hosts = {};
@@ -114,6 +150,10 @@ var snmpErrors = function(callback) {
 
 var snmpSaves = function(callback) {
   redisMetricToDict('metric:snmp.metrics.saved', 'metrics', callback);
+};
+
+var switchModel = function(callback) {
+  redisMetricToDict('metric:snmpcollector.model.str', 'model', callback);
 };
 
 var switchVersion = function(callback) {
@@ -214,6 +254,14 @@ var paths = {
   "switch.version": {
     "method": switchVersion,
     "what": "List of all firmwares for switches"
+  },
+  "switch.interfaces": {
+    "method": switchInterfaces,
+    "what": "List of all interfaces for switches"
+  },
+  "switch.model": {
+    "method": switchModel,
+    "what": "List of all models of switches"
   },
   "rancid.status": {
     "method": rancidStatus,
