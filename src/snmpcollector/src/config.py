@@ -17,19 +17,22 @@ _timestamp = 0
 
 def refresh():
   new_config = None
-  with file(CONFIG_FILENAME, 'r') as f:
-    new_config = yaml.load(f)
+  try:
+    with file(CONFIG_FILENAME, 'r') as f:
+      new_config = yaml.load(f)
 
-  if new_config == _config:
+    if new_config == _config:
+      return
+
+    global incarnation
+    global _config
+    global _timestamp
+  except Exception:
+    logger.exception('Exception while reading new config, ignoring')
     return
-
-  global incarnation
-  global _config
-  global _timestamp
   incarnation += 1
   _config = new_config
   _timestamp = time.time()
-
 
 def get(*path):
   if _timestamp + CONFIG_CACHE < time.time():
