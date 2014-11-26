@@ -3,6 +3,10 @@ var config = require('./config').Config(__dirname+'/config.ini').get();
 var logger = require('./logger').Logging().get('project-debug.log');
 var util = require('util');
 
+// Set up ipplan
+var ipplan = require('./ipplan');
+var ipplanDB = ipplan.init(config.ipplan.file);
+
 // Connect to Redis
 var redis = require('redis');
 var db = redis.createClient(config.redis.port, config.redis.host);
@@ -11,7 +15,20 @@ var db = redis.createClient(config.redis.port, config.redis.host);
 var Memcached = require('memcached');
 var memcached = new Memcached('dhmon.event.dreamhack.se:11211');
 
-var switchesStatus = function(callback) {
+var eventHosts = function(callback) {
+  ipplanDB.getEventHosts(function(objects) {
+    dict = {};
+    for (var idx in objects) {
+      var row = objects[idx];
+      if (!dict.hasOwnProperty(row['host']))
+        dict[row['host']] = {'options': {}};
+      dict[row['host']].options[row['option']] = row['value'];
+    }
+    callback(dict);
+  });
+}
+
+var pingStatus = function(callback) {
   db.zrange('metric:ipplan-pinger.us', 0, -1, 'withscores',
             function(err, data) {
     var metrics = {};
@@ -44,14 +61,73 @@ var switchesStatus = function(callback) {
   });
 };
 
-var snmpErrors = function(callback) {
-  db.zrange('metric:snmpcollector.no-model.str', 0, -1, 'withscores',
-            function(err, data) {
+function redisMetricToDict(key, property, callback) {
+  db.zrange(key, 0, -1, 'withscores', function(err, data) {
     var hosts = {};
     for ( var i = 0; i < data.length; i+=2 ) {
       var entry = JSON.parse(data[i]);
       var last_beat = ((new Date().getTime()) - data[i+1])/1000;
-      hosts[entry['host']] = {'error': entry['value'], 'since': last_beat};
+      hosts[entry['host']] = {'since': last_beat};
+      hosts[entry['host']][property] = entry['value'];
+    }
+    callback(hosts);
+  });
+}
+
+var rancidStatus = function(callback) {
+  db.zrange('metric:rancid.size', 0, -1, function(err, data) {
+    var hosts = {};
+    for ( var i = 0; i < data.length; i++ ) {
+      var entry = JSON.parse(data[i]);
+      hosts[entry['host']] = {'size': entry.value};
+    }
+    db.zrange('metric:rancid.updated', 0, -1, function(err, data) {
+      for ( var i = 0; i < data.length; i++ ) {
+        var entry = JSON.parse(data[i]);
+        hosts[entry['host']].since = entry.value;
+      }
+      callback(hosts);
+    });
+  });
+};
+
+var syslogStatus = function(callback) {
+  db.zrange('metric:syslog.size', 0, -1, function(err, data) {
+    var hosts = {};
+    for ( var i = 0; i < data.length; i++ ) {
+      var entry = JSON.parse(data[i]);
+      hosts[entry['host']] = {'size': entry.value};
+    }
+    db.zrange('metric:syslog.updated', 0, -1, function(err, data) {
+      for ( var i = 0; i < data.length; i++ ) {
+        var entry = JSON.parse(data[i]);
+        hosts[entry['host']].since = entry.value;
+      }
+      callback(hosts);
+    });
+  });
+};
+
+var snmpErrors = function(callback) {
+  redisMetricToDict('metric:snmpcollector.no-model.str', 'error', callback);
+};
+
+var snmpSaves = function(callback) {
+  redisMetricToDict('metric:snmp.metrics.saved', 'metrics', callback);
+};
+
+var switchVersion = function(callback) {
+  key = 'metric:snmp.1.3.6.1.2.1.47.1.1.1.1.9';
+  property = 'version';
+  db.zrange(key, 0, -1, 'withscores', function(err, data) {
+    var hosts = {};
+    for ( var i = 0; i < data.length; i+=2 ) {
+      var entry = JSON.parse(data[i]);
+      var last_beat = ((new Date().getTime()) - data[i+1])/1000;
+      if (entry['lastoid'] != '1')
+        continue
+      hosts[entry['host']] = {'since': last_beat};
+      hosts[entry['host']][property] = entry['value'];
     }
     callback(hosts);
   });
@@ -67,6 +143,8 @@ function snmpMetricToDict(data) {
 }
 
 function decodeSnmpValue(raw) {
+  if (raw == undefined)
+    return '';
   var idx = raw.indexOf(':');
   return raw.substring(idx+1);
 }
@@ -113,17 +191,37 @@ var documentation = function() {
 }
 
 var paths = {
-  "switches.status": {
-    "method": switchesStatus,
-    "what": "Status of all switched currently being polled"
+  "ping.status": {
+    "method": pingStatus,
+    "what": "Status of all hosts currently being polled"
   },
   "snmp.errors": {
     "method": snmpErrors,
     "what": "List of all recent SNMP collection errors"
   },
+  "snmp.saves": {
+    "method": snmpSaves,
+    "what": "List of how many metrics recent SNMP collections resulted in"
+  },
   "inventory": {
     "method": inventory,
     "what": "List of all inventory information"
+  },
+  "event.hosts": {
+    "method": eventHosts,
+    "what": "List of all hosts in the event domain"
+  },
+  "switch.version": {
+    "method": switchVersion,
+    "what": "List of all firmwares for switches"
+  },
+  "rancid.status": {
+    "method": rancidStatus,
+    "what": "List of all rancid log status"
+  },
+  "syslog.status": {
+    "method": syslogStatus,
+    "what": "List of all syslog log status"
   }
 };
 

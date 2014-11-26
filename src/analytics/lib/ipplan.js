@@ -25,6 +25,12 @@ ipplan.prototype.getObjects = function(hall, callback) {
   });
 };
 
+ipplan.prototype.getEventHosts = function(callback) {
+  this.db.all("SELECT substr(network.name, 7) as network, host.name as host, option.name as option, option.value as value FROM network, host, option WHERE host.network_id = network.node_id AND network.name LIKE 'EVENT@%' AND option.node_id = host.node_id", function(err, objects) {
+      callback(objects);
+  });
+};
+
 var init = function(file) {
   return new ipplan(file);
 }
