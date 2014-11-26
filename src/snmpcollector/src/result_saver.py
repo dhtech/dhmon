@@ -52,13 +52,6 @@ class ResultSaver(stage.Stage):
       bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
           hostname=target.host, metric='snmp%s' % oid, value=value)
       metrics.append(bulkmetric)
-
-      oidparts = oid.split('.')
-      rootoid = '.'.join(oidparts[:-1])
-      bulkmetric = self.dhmon.BulkMetric(timestamp=timestamp,
-          hostname='%s:%s' % (target.host, oidparts[-1]),
-          metric='snmp%s' % rootoid, value=value)
-      metrics.append(bulkmetric)
       saved += 1
 
     # Save collection stats
