@@ -32,6 +32,7 @@ redis_metric_time = {}
 influxdb_metric_time = {}
 
 memcache_metrics = ['ipplan-pinger.us']
+holdoff_whitelist = ['snmp.metrics.saved']
 
 
 class Error(Exception):
@@ -119,6 +120,9 @@ def check_acl(metrics, queue, user):
 
 
 def is_holdoff(metric_time, metric, holdoff):
+  if metric['metric'] in holdoff_whitelist:
+    return False
+
   timestamp = int(metric['time']) * 1000
   metric_id = '%s.%s.%s' % (
       metric['metric'], metric['host'], metric['prober'])
