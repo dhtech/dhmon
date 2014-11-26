@@ -69,6 +69,7 @@ class SnmpWorker(stage.Stage):
       return
 
     logging.debug('Object %s is model %s', target.host, model)
+    dhmon.metric('snmpcollector.model.str', value=model, hostname=target.host)
     global_oids, vlan_oids = self.gather_oids(target, model)
 
     # 'None' is global (no VLAN aware)
