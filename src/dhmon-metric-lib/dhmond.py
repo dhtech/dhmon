@@ -164,11 +164,13 @@ def redis_consume(backend, metrics):
     }))
 
 
-def redis_clean():
+def redis_clean(redis_server):
   backend = redis.StrictRedis(redis_server)
   while True:
     timestamp = int(time.time() * 1000)
     for key in backend.keys():
+      if not key.startswith('metric:') and not key.startswith('host:'):
+        continue
       backend.zremrangebyscore(key, 0, timestamp - REDIS_TIMEOUT)
     elapsed = int(time.time() * 1000) - timestamp
     syslog.syslog(syslog.LOG_INFO, 'Redis cleaner is done, it took %d ms' % (
@@ -253,7 +255,8 @@ if __name__ == '__main__':
     backend.connect(metric_server)
     consume(mq, backend, 'dhmon:metrics:influxdb', influxdb_consume)
   elif not os.fork():
-    redis_clean_thread = threading.Thread(target=redis_clean)
+    redis_clean_thread = threading.Thread(
+        target=redis_clean, args=(redis_server, ))
     redis_clean_thread.daemon = True
     redis_clean_thread.start()
     backend = redis.StrictRedis(redis_server)
