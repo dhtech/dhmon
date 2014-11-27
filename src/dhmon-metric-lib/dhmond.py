@@ -17,7 +17,7 @@ import yaml
 REDIS_TIMEOUT = 60 * 10 * 1000
 
 # How often to run the cleanup command
-REDIS_CLEAN_INTERVAL = 60 * 10
+REDIS_CLEAN_INTERVAL = 60 * 2
 
 # Be gentle to slow backends, we use memcache for low-latency stuff
 REDIS_HOLDOFF = 160 * 1000
