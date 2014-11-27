@@ -78,48 +78,39 @@ function redisMetricToDict(key, property, callback) {
 // best practices says about this, but it would be nice to send all requests
 // at the same time and wait for all data to come back.
 // Right now I'm cheating with the indentation to "handle" it.
+
+function ifaceSnmpToDict(data) {
+  var res = {}
+  for ( var i = 0; i < data.length; i++ ) {
+    var entry = JSON.parse(data[i]);
+    res[entry.host+'@'+entry.lastoid.split('@')[0]] = entry.value;
+  }
+  return res;
+}
+
 var switchInterfaces = function(callback) {
   db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.2', 0, -1, function(err, data) {
-    var ifaces = {};
-    for ( var i = 0; i < data.length; i++ ) {
-      var entry = JSON.parse(data[i]);
-      ifaces[entry.host+'@'+entry.lastoid] = entry.value;
-    }
-  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.8', 0, -1,
-    function(err, data) {
-    var iface_status = {};
-    for ( var i = 0; i < data.length; i++ ) {
-      var entry = JSON.parse(data[i]);
-      iface_status[entry.host+'@'+entry.lastoid] = entry.value;
-    }
+    var ifaces = ifaceSnmpToDict(data);
+  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.8', 0, -1, function(err, data) {
+    var iface_status = ifaceSnmpToDict(data);
   db.zrange('metric:snmp.1.3.6.1.4.1.9.9.46.1.6.1.1.14', 0, -1,
     function(err, data) {
-    var trunks = {};
+    var trunks = ifaceSnmpToDict(data);
+  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.20', 0, -1, function(err, data) {
+    var out_errors = ifaceSnmpToDict(data);
+  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.14', 0, -1, function(err, data) {
+    var in_errors = ifaceSnmpToDict(data);
+  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.7', 0, -1, function(err, data) {
+    var admin_status = ifaceSnmpToDict(data);
+  db.zrange('metric:snmp.1.3.6.1.2.1.17.1.4.1.2', 0, -1, function(err, data) {
+    var dot1d_map = {}
     for ( var i = 0; i < data.length; i++ ) {
       var entry = JSON.parse(data[i]);
-      trunks[entry.host+'@'+entry.lastoid] = entry.value;
+      dot1d_map[entry.host+'@'+entry.value] =
+        entry.host + '@' + entry.lastoid.split('@')[0];
     }
-  db.zrange('metric:snmp.1.3.6.1.4.1.9.9.46.1.6.1.1.14', 0, -1,
-    function(err, data) {
-    var trunks = {};
-    for ( var i = 0; i < data.length; i++ ) {
-      var entry = JSON.parse(data[i]);
-      trunks[entry.host+'@'+entry.lastoid] = entry.value;
-    }
-  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.20', 0, -1,
-    function(err, data) {
-    var out_errors = {};
-    for ( var i = 0; i < data.length; i++ ) {
-      var entry = JSON.parse(data[i]);
-      out_errors[entry.host+'@'+entry.lastoid] = entry.value;
-    }
-  db.zrange('metric:snmp.1.3.6.1.2.1.2.2.1.14', 0, -1,
-    function(err, data) {
-    var in_errors = {};
-    for ( var i = 0; i < data.length; i++ ) {
-      var entry = JSON.parse(data[i]);
-      in_errors[entry.host+'@'+entry.lastoid] = entry.value;
-    }
+  db.zrange('metric:snmp.1.3.6.1.2.1.17.2.15.1.3', 0, -1, function(err, data) {
+    var stp_status = ifaceSnmpToDict(data);
   db.zrange('metric:snmp.1.3.6.1.2.1.31.1.1.1.15', 0, -1, 'withscores',
     function(err, speed) {
     var switches = {};
@@ -134,12 +125,20 @@ var switchInterfaces = function(callback) {
       var ifacestat = statusnum == '1' ? 'up' : 'down';
       var last_beat = ((new Date().getTime()) - speed[i+1])/1000;
       var trunk_status = trunks[iid] == '1';
+      var admin = admin_status[iid] == '1' ? 'up' : 'down';
+      var stp = 'error';
+      if (stp_status[dot1d_map[iid]] == '5')
+        stp = 'forwarding';
+      if (stp_status[dot1d_map[iid]] == undefined)
+        stp = 'unknown';
       switches[entry.host][iface] = {
         'since': last_beat, 'speed': entry.value, 'status': ifacestat,
-        'trunk': trunk_status,
-        'errors': {'in': in_errors[iid], 'out': out_errors[iid]}};
+        'trunk': trunk_status, 'lastoid': entry.lastoid, 'admin': admin,
+        'stp': stp, 'errors': {'in': in_errors[iid], 'out': out_errors[iid]}};
     }
     callback(switches);
+  });
+  });
   });
   });
   });
