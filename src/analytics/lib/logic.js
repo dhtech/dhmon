@@ -148,6 +148,40 @@ var switchInterfaces = function(callback) {
   });
 };
 
+var switchVlans = function(callback) {
+  var key = 'metric:snmp.1.3.6.1.4.1.9.9.46.1.3.1.1.2.1';
+  db.zrange(key, 0, -1, 'withscores', function(err, data) {
+    var hosts = {};
+    for ( var i = 0; i < data.length; i+=2 ) {
+      var entry = JSON.parse(data[i]);
+      var last_beat = ((new Date().getTime()) - data[i+1])/1000;
+      if (!hosts.hasOwnProperty(entry['host'])) {
+        hosts[entry['host']] = {};
+      }
+      hosts[entry['host']][entry['lastoid']] = {'since': last_beat};
+    }
+    callback(hosts);
+  });
+};
+
+var dhcpStatus = function(callback) {
+  redisMetricToDict('metric:dhcp.usage', 'usage', function(usage) {
+    redisMetricToDict('metric:dhcp.max', 'max', function(max) {
+      result = {};
+      for(var idx in max) {
+        var vlan = idx.split(':')[0]
+        var network = idx.split(':')[1]
+        var domain = network.split('@')[0];
+        network = network.split('@')[1];
+        result[network] = {
+          'domain': domain, 'vlan': vlan, 'usage': usage[idx].usage,
+          'max': max[idx].max, 'since': usage[idx].since};
+      }
+      callback(result);
+    });
+  });
+};
+
 var rancidStatus = function(callback) {
   db.zrange('metric:rancid.size', 0, -1, function(err, data) {
     var hosts = {};
@@ -297,6 +331,10 @@ var paths = {
     "method": switchInterfaces,
     "what": "List of all interfaces for switches"
   },
+  "switch.vlans": {
+    "method":  switchVlans,
+    "what": "List of all vlans for switches"
+  },
   "switch.model": {
     "method": switchModel,
     "what": "List of all models of switches"
@@ -308,7 +346,11 @@ var paths = {
   "syslog.status": {
     "method": syslogStatus,
     "what": "List of all syslog log status"
-  }
+  },
+  "dhcp.status": {
+    "method":  dhcpStatus,
+    "what": "List status of DHCP leases"
+  },
 };
 
 var updateCache = function(path, data, callback) {
