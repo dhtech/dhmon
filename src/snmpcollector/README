@@ -11,3 +11,4 @@ Use python-pika >= 0.9.14 (weird framing error otherwise)
 Selective restart:
 sudo LIMITRESTART=worker /etc/init.d/dhmon-snmpcollector restart
 
+Configuration is read every minute and reloaded internally if it's different.
