@@ -116,7 +116,10 @@ def check_acl(metrics, queue, user):
     raise AccessDeniedError('No user supplied')
   if user == 'dhmon':
     return
-  raise AccessDeniedError('User is denied')
+  for metric in metrics:
+    if user == 'purchase' and metric['metric'].startswith('purchase'):
+      continue
+    raise AccessDeniedError('User is denied')
 
 
 def is_holdoff(metric_time, metric, holdoff):
