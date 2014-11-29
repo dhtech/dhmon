@@ -22,6 +22,8 @@ class ProcessAction(stage.Action):
 
 # TODO(bluecmd): This stage is not designed to run with multiple
 # instances, but is perpared to be modified to allowed that.
+
+# TODO(bluecmd): Make this period agnostic (save timestamp and normalize)
 class ResultProcessor(stage.Stage):
 
   def __init__(self):
