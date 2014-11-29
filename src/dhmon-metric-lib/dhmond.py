@@ -20,7 +20,7 @@ REDIS_TIMEOUT = 60 * 10 * 1000
 REDIS_CLEAN_INTERVAL = 60 * 2
 
 # Be gentle to slow backends, we use memcache for low-latency stuff
-REDIS_HOLDOFF = 160 * 1000
+REDIS_HOLDOFF = 200 * 1000
 INFLUXDB_HOLDOFF = 14 * 1000
 
 # Memcache expiry setting on entries (seconds)
@@ -31,7 +31,7 @@ MEMCACHE_TTL = 3600
 redis_metric_time = {}
 influxdb_metric_time = {}
 
-memcache_metrics = ['ipplan-pinger.us']
+memcache_metrics = ['ipplan-pinger.us', 'snmp.metrics.saved']
 holdoff_whitelist = ['snmp.metrics.saved']
 
 
