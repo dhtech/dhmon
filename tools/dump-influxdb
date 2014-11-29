@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd $(dirname $0)
-timestamp=influxdb-$(date +'%Y-%m-%d_%H:%M')
+timestamp=influxdb-$(date +'%Y-%m-%d_%H%M')
 
 mkdir $timestamp
 cd $timestamp
@@ -13,6 +13,12 @@ echo 'Getting list of series ...'
 wget -q "http://dhmon:8086/db/dhmon/series?u=${username}&p=${password}&q=list+series" -O series.lst
 echo 'Dumping series, this will take a while ..'
 ../parse_series.py | xargs -P 6 -I{} wget -q "http://dhmon:8086/db/dhmon/series?u=${username}&p=${password}&q=select+*+from+%22{}%22+where+time+>+now()+-+4h+group+by+time(1m)" -O {}.lst
+
+echo 'Compressing'
+
+cd ..
+tar -cJf $timestamp.tar.xz $timestamp
+rm -r $timestamp
 
 echo 'Done'
 
