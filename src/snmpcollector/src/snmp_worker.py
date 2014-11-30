@@ -56,6 +56,20 @@ class SnmpWorker(stage.Stage):
     self.model_oid_cache[cache_key] = list(oids)
     return list(oids), list(vlan_aware_oids)
 
+  def do_overrides(self, results):
+    overrides = config.get('worker', 'override')
+    if not overrides:
+      return results
+    overridden_oids = set(overrides.keys())
+
+    overriden_results = results
+    for oid, result in results.iteritems():
+      root = '.'.join(oid.split('.')[:-1])
+      if root in overridden_oids:
+        overriden_results[oid] = snmp_target.ResultTuple(
+            result.value, overrides[root])
+    return overriden_results
+
   def do_snmp_walk(self, target):
     try:
       model = target.model()
@@ -92,7 +106,7 @@ class SnmpWorker(stage.Stage):
               'OID %s does not start with .1, please verify configuration', oid)
           continue
         try:
-          results.update(target.walk(oid, vlan))
+          results.update(self.do_overrides(target.walk(oid, vlan)))
         except snmp_target.TimeoutError, e:
           dhmon.metric(
               'snmpcollector.timeout.%s.str' % ('vlan' if vlan else 'global', ),

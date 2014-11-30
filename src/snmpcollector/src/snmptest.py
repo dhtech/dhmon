@@ -30,8 +30,10 @@ print 'Target model:', model
 
 print 'Target VLANs:', target.vlans()
 
-for action in worker_stage.do_snmp_walk(target):
-  for key in sorted(action.results.keys()):
-    print key, action.results[key]
-
-
+if len(sys.argv) > 2:
+  for i in target.walk(sys.argv[2]).iteritems():
+    print i
+else:
+  for action in worker_stage.do_snmp_walk(target):
+    for key in sorted(action.results.keys()):
+      print key, action.results[key]
