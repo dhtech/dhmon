@@ -6,7 +6,7 @@
 # track of run time of the scripts.
 LAUNCHER="pinger snmpcollector"
 
-DAEMON_ID="1"
+DAEMON_ID="0"
 
 # == SNMP collector ==
 # Set these values to > 0 to enable the daemon.
@@ -20,7 +20,7 @@ SNMP_SUPERVISORS="1"
 # One worker will poll one switch given to it by a supervisor and block during
 # the whole poll phase. If you feel like the collection is too slow, and you
 # have CPU to spare - increase this number.
-SNMP_WORKERS="100"
+SNMP_WORKERS="60"
 
 # This is a single point where all the data points to go to get filtered,
 # mangled and otherwised processed. This makes sure that wrap-arounds are masked
