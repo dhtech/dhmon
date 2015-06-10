@@ -1,10 +1,9 @@
 #!/usr/bin/env python2
-import dhmon
 import logging
 import re
 
 import config
-import result_processor
+import result_saver
 import snmp_target
 import stage
 
@@ -74,16 +73,16 @@ class SnmpWorker(stage.Stage):
     try:
       model = target.model()
     except snmp_target.Error, e:
-      dhmon.metric('snmpcollector.no-model.str', value=str(e),
-                   hostname=target.host)
+      #dhmon.metric('snmpcollector.no-model.str', value=str(e),
+      #             hostname=target.host)
       return
     if not model:
       # TODO(bluecmd): Replace with events in 2.0?
-      dhmon.metric('snmpcollector.no-model.str', value='', hostname=target.host)
+      #dhmon.metric('snmpcollector.no-model.str', value='', hostname=target.host)
       return
 
     logging.debug('Object %s is model %s', target.host, model)
-    dhmon.metric('snmpcollector.model.str', value=model, hostname=target.host)
+    #dhmon.metric('snmpcollector.model.str', value=model, hostname=target.host)
     global_oids, vlan_oids = self.gather_oids(target, model)
 
     # 'None' is global (no VLAN aware)
@@ -92,8 +91,8 @@ class SnmpWorker(stage.Stage):
       if vlan_oids:
         vlans.update(target.vlans())
     except snmp_target.Error, e:
-      dhmon.metric('snmpcollector.errors.str', value=str(e),
-                   hostname=target.host)
+      #dhmon.metric('snmpcollector.errors.str', value=str(e),
+      #             hostname=target.host)
       logging.warning('Could not list VLANs: %s', str(e))
 
     results = {}
@@ -108,23 +107,22 @@ class SnmpWorker(stage.Stage):
         try:
           results.update(self.do_overrides(target.walk(oid, vlan)))
         except snmp_target.TimeoutError, e:
-          dhmon.metric(
-              'snmpcollector.timeout.%s.str' % ('vlan' if vlan else 'global', ),
-              str(e), hostname=target.host)
+          #dhmon.metric(
+          #    'snmpcollector.timeout.%s.str' % ('vlan' if vlan else 'global', ),
+          #    str(e), hostname=target.host)
           if vlan:
             logging.debug(
                 'Timeout, is switch configured for VLAN SNMP context? %s', e)
           else:
             logging.debug('Timeout, slow switch? %s', e)
         except snmp_target.Error, e:
-          dhmon.metric('snmpcollector.errors.str', value=str(e),
-                       hostname=target.host)
+          #dhmon.metric('snmpcollector.errors.str', value=str(e),
+          #             hostname=target.host)
           logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
  
-
     logging.debug('Done SNMP poll (%d objects) for "%s"',
         len(results.keys()), target.host)
-    yield result_processor.ProcessAction(target, results)
+    yield result_saver.SaveAction(target, results)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,5 @@
 import abc
 import argparse
-import dhmon
 import logging
 import logging.handlers
 import os
@@ -70,8 +69,8 @@ class Stage(object):
     try:
       self._task_callback(channel, method, properties, body)
     except Exception, e:
-      dhmon.metric(
-          'snmpcollector.task.exceptions.str', str(e), hostname=self.name)
+      #dhmon.metric(
+      #    'snmpcollector.task.exceptions.str', str(e), hostname=self.name)
       logging.exception('Unhandled exception in task loop:')
 
   def _task_callback(self, channel, method, properties, body):
