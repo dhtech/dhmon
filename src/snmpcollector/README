@@ -1,8 +1,8 @@
-
 # Dependencies
 
-Use libsnmp30 and python-netsnmp (required for SNMPv3)
+pip install prometheus_client
 
+Use libsnmp30 and python-netsnmp (required for SNMPv3)
 Use python-pika >= 0.9.14 (weird framing error otherwise)
 
 
