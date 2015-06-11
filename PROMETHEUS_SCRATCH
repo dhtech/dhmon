@@ -1,0 +1,15 @@
+Scratch notes for prometheus
+
+./node_exporter  -web.listen-address=':13000' -collectors.enabled='diskstats,filesystem,loadavg,meminfo,stat,textfile,time,netdev,netstat,bonding,lastlogin,ntp' -collector.ntp.server='localhost'
+ GOMAXPROCS=8 ./prometheus  -web.listen-address=:9090  -web.path-prefix='/prometheus/' -storage.local.path=/srv/metrics
+
+ProxyPass /prometheus http://localhost:9090/prometheus
+ProxyPass /mq http://localhost:15672
+
+rabbitmq-plugins enable rabbitmq_management
+
+rabbitmqctl add_user dhtech
+rabbitmqctl set_user_tags dhtech administrator
+rabbitmqctl set_permissions dhtech '.*' '.*' '.*'
+
+
