@@ -1,14 +1,17 @@
 #!/usr/bin/env python2
+import BaseHTTPServer
 import base64
 import logging
 import prometheus_client
+import threading
 import time
 
 import config
 import stage
 
 
-HTTP_PORT = 13100
+HTTP_MAIN_PORT = 13100
+HTTP_SNMP_PORT = 13101
 
 OID_ifDescr = '.1.3.6.1.2.1.2.2.1.2.'
 
@@ -34,6 +37,7 @@ class ResultSaver(stage.Stage):
     self.mibresolver = None
     self.mibcache = {}
     self.metrics = {}
+    self.export_lock = threading.Lock()
 
   def startup(self):
     import mibresolver
@@ -41,12 +45,12 @@ class ResultSaver(stage.Stage):
     super(ResultSaver, self).startup()
 
   def do_save(self, target, results):
-    with self.save_time.time():
-      self._save(target, results)
+    with self.export_lock:
+      with self.save_time.time():
+        self._save(target, results)
 
   def _save(self, target, results):
     if_oids = config.get('saver', 'if-oids')
-    timestamp = int(target.timestamp)
 
     saved = 0
 
@@ -84,36 +88,70 @@ class ResultSaver(stage.Stage):
           break
 
       value = result.value
-      if result.type in self.NUMERIC_TYPES:
-        self.export_numeric(target, result, mib, obj, index, interface)
-      else:
-        self.export_blob(target, result, mib, obj, index, interface)
+      self.export(target, result, mib, obj, index, interface)
       saved += 1
 
     # Save collection stats
     logging.debug('Save completed for %d metrics for %s', saved, target.host)
 
-  def export_numeric(self, target, result, mib, obj, index, interface):
+  def export(self, target, result, mib, obj, index, interface):
     metric = self.metrics.get(obj, None)
     if not metric:
       if result.type == 'COUNTER64' or result.type == 'COUNTER':
-        metric = prometheus_client.Counter(obj, '%s::%s' % (mib, obj),
-            ['device', 'index', 'interface', 'type'])
+        metric_type = 'counter'
+      elif result.type in self.NUMERIC_TYPES:
+        metric_type = 'gauge'
       else:
-        metric = prometheus_client.Gauge(obj, '%s::%s' % (mib, obj),
-            ['device', 'index', 'interface', 'type'])
+        metric_type = 'blob'
+      metric = (mib, metric_type, {})
       self.metrics[obj] = metric
 
-    instance = metric.labels(target.host, index, interface, result.type)
-    # HACK: metrics only support delta increments currently
-    with instance._lock:
-      instance._value = int(result.value)
+    _, _, labels = self.metrics[obj]
+    labels[(target.host, index, interface, result.type)] = (
+        result.value, target.timestamp)
 
-  def export_blob(self, target, result, mib, obj, index, interface):
-    # TODO
-    pass
+  def write_metrics(self, out):
+    with self.export_lock:
+      for obj, (mib, metrics_type, labels_map) in self.metrics.iteritems():
+        if metrics_type != 'counter' and metrics_type != 'gauge':
+          continue
+        out.write('# HELP {0} {1}::{0}\n'.format(obj, mib))
+        out.write('# TYPE {0} {1}\n'.format(obj, metrics_type))
+        for (host, index, interface, type), (value, timestamp) in (
+            labels_map.iteritems()):
+          instance = obj
+          instance += '{'
+          instance += 'device="{0}",'.format(host)
+          instance += 'index="{0}",'.format(index)
+          instance += 'interface="{0}",'.format(interface)
+          instance += 'type="{0}"'.format(type)
+          instance += '}'
+          out.write('{0} {1} {2}\n'.format(
+            instance, value, int(timestamp * 1000)))
+
 
 if __name__ == '__main__':
-  prometheus_client.start_http_server(HTTP_PORT)
   stage = ResultSaver()
+
+  class MetricsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+    def do_GET(self):
+      self.send_response(200)
+      self.send_header(
+        'Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+      self.end_headers()
+      stage.write_metrics(self.wfile)
+
+    def log_message(self, format, *args):
+      return
+
+  class PrometheusMetricsServer(threading.Thread):
+    def run(self):
+      httpd = BaseHTTPServer.HTTPServer(('', HTTP_SNMP_PORT), MetricsHandler)
+      httpd.serve_forever()
+  t = PrometheusMetricsServer()
+  t.daemon = True
+  t.start()
+
+  prometheus_client.start_http_server(HTTP_MAIN_PORT)
+
   stage.run()
