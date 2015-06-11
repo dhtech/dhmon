@@ -12,4 +12,4 @@ rabbitmqctl add_user dhtech
 rabbitmqctl set_user_tags dhtech administrator
 rabbitmqctl set_permissions dhtech '.*' '.*' '.*'
 
-
+ipplan-pinger > /var/tmp/export/ipplan-pinger.prom
