@@ -1,7 +1,9 @@
 #!/usr/bin/env python2
+import collections
 import logging
 import re
 
+import actions
 import config
 import target
 import stage
@@ -10,7 +12,7 @@ import stage
 class Worker(stage.Stage):
 
   def __init__(self):
-    super(SnmpWorker, self).__init__()
+    super(Worker, self).__init__()
     self.model_oid_cache = {}
     self.model_oid_cache_incarnation = 0
 
@@ -61,17 +63,17 @@ class Worker(stage.Stage):
     try:
       model = target.model()
     except target.Error, e:
-      #dhmon.metric('snmpcollector.no-model.str', value=str(e),
-      #             hostname=target.host)
+      logging.exception('Could not determine model of %s:', target.host)
       return
     if not model:
-      # TODO(bluecmd): Replace with events in 2.0?
-      #dhmon.metric('snmpcollector.no-model.str', value='', hostname=target.host)
+      logging.error('Could not determine model of %s')
       return
 
     logging.debug('Object %s is model %s', target.host, model)
-    #dhmon.metric('snmpcollector.model.str', value=model, hostname=target.host)
     global_oids, vlan_oids = self.gather_oids(target, model)
+
+    timeouts = 0
+    errors = 0
 
     # 'None' is global (no VLAN aware)
     vlans = set([None])
@@ -79,8 +81,7 @@ class Worker(stage.Stage):
       if vlan_oids:
         vlans.update(target.vlans())
     except target.Error, e:
-      #dhmon.metric('snmpcollector.errors.str', value=str(e),
-      #             hostname=target.host)
+      errors += 1
       logging.warning('Could not list VLANs: %s', str(e))
 
     results = {}
@@ -95,22 +96,19 @@ class Worker(stage.Stage):
         try:
           results.update(self.do_overrides(target.walk(oid, vlan)))
         except target.TimeoutError, e:
-          #dhmon.metric(
-          #    'snmpcollector.timeout.%s.str' % ('vlan' if vlan else 'global', ),
-          #    str(e), hostname=target.host)
+          timeouts += 1
           if vlan:
             logging.debug(
                 'Timeout, is switch configured for VLAN SNMP context? %s', e)
           else:
             logging.debug('Timeout, slow switch? %s', e)
         except target.Error, e:
-          #dhmon.metric('snmpcollector.errors.str', value=str(e),
-          #             hostname=target.host)
+          errors += 1
           logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
  
     logging.debug('Done SNMP poll (%d objects) for "%s"',
         len(results.keys()), target.host)
-    yield actions.Result(target, results)
+    yield actions.Result(target, results, actions.Statistics(timeouts, errors))
 
 
 if __name__ == '__main__':

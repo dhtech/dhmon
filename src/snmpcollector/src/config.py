@@ -16,20 +16,20 @@ _timestamp = 0
 
 
 def refresh():
+  global incarnation
+  global _config
+  global _timestamp
+
   new_config = None
   try:
     with file(CONFIG_FILENAME, 'r') as f:
       new_config = yaml.load(f)
-
     if new_config == _config:
       return
-
-    global incarnation
-    global _config
-    global _timestamp
   except Exception:
     logger.exception('Exception while reading new config, ignoring')
     return
+
   incarnation += 1
   _config = new_config
   _timestamp = time.time()

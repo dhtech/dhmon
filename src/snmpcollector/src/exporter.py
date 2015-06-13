@@ -6,12 +6,13 @@ import prometheus_client
 import threading
 import time
 
+import actions
 import config
 import stage
 
 
-HTTP_MAIN_PORT = 13100
-HTTP_SNMP_PORT = 13101
+HTTP_MAIN_PORT = 13200
+HTTP_SNMP_PORT = 13201
 
 
 class Exporter(stage.Stage):
@@ -23,9 +24,10 @@ class Exporter(stage.Stage):
     self.metrics = {}
     self.export_lock = threading.Lock()
 
-  def do_result(self, target, results):
+  def do_result(self, target, results, stats):
     with self.export_lock:
       self._save(target, results)
+    # TODO(bluecmd): Record the stats we are given
 
   def _save(self, target, results):
     for oid, result in results.iteritems():
@@ -50,7 +52,7 @@ class Exporter(stage.Stage):
     labels[(
       target.host, result.index, result.interface,
       result.vlan, result.data.type)] = (
-          result.value, target.timestamp)
+          result.data.value, target.timestamp)
 
   def write_metrics(self, out):
     # We only care about the list structure and its references so a

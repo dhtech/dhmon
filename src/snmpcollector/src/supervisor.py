@@ -29,8 +29,7 @@ class Supervisor(stage.Stage):
         logging.error('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
         continue
-      yield host, snmp_target.SnmpTarget(host, ip, timestamp, layer,
-                                         **layer_config)
+      yield host, target.SnmpTarget(host, ip, timestamp, layer, **layer_config)
 
   def do_trigger(self):
     timestamp = time.time()
@@ -42,13 +41,14 @@ class Supervisor(stage.Stage):
 
     # Record how many targets there are in this round to make it
     # possible to record pipeline latency
-    yield actions.Finish(timestamp, targets)
+    yield actions.Summary(timestamp, targets)
 
     logging.info('New work pushed')
 
 
 if __name__ == '__main__':
   stage = Supervisor()
+  stage.startup()
   stage.purge(actions.Trigger)
   stage.listen(actions.Trigger)
   stage.run()

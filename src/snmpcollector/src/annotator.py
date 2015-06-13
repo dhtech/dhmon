@@ -4,23 +4,20 @@ import collections
 import logging
 import time
 
+import actions
 import config
 import mibresolver
 import stage
-
-
-AnnotatedResult = collections.namedtuple('AnnotatedResult',
-    ('data', 'mib', 'obj', 'index', 'interface', 'vlan'))
 
 
 class Annotator(stage.Stage):
   """Annotation step where results are given meaningful labels."""
 
   def __init__(self):
-    super(ResultSaver, self).__init__()
+    super(Annotator, self).__init__()
     self.mibcache = {}
 
-  def do_result(self, target, results):
+  def do_result(self, target, results, stats):
     if_oids = config.get('annotator', 'annotate-oids-with-iface')
     iface_oid = config.get('annotator', 'iface-oid') + '.'
 
@@ -34,7 +31,7 @@ class Annotator(stage.Stage):
       if oid.startswith(iface_oid):
         interfaces_map[oid[len(iface_oid):]] = result.value
 
-    annotated_results = []
+    annotated_results = {}
     for oid, result in results.iteritems():
       # Record some stats on how long time it took to get this metric
       elapsed = (time.time() - target.timestamp) * 1000 * 1000
@@ -61,11 +58,10 @@ class Annotator(stage.Stage):
           interface = interfaces_map.get(index, None)
           break
 
-      value = result.value
-      annotated_results.append(AnnotatedResult(
-        result, mib, obj, index, interface, vlan))
+      annotated_results[oid] = actions.AnnotatedResultEntry(
+        result, mib, obj, index, interface, vlan)
 
-    yield actions.AnnotatedResult(target, annotated_results)
+    yield actions.AnnotatedResult(target, annotated_results, stats)
     logging.debug('Annotation completed for %d metrics for %s',
         len(annotated_results), target.host)
 

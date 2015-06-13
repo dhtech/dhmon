@@ -28,8 +28,10 @@ class Stage(object):
     self.result_channel = None
     self.connection = None
     self.args = None
+    self.started = False
 
   def startup(self):
+    assert not self.started
     root = logging.getLogger()
     root.addHandler(logging.handlers.SysLogHandler('/dev/log'))
     root.setLevel(logging.INFO)
@@ -41,10 +43,11 @@ class Stage(object):
     parser.add_argument(
         '-i', '--instance', dest='instance', default='default',
         help='specifiy instance id, used to run multiple instances')
-    parser.add_argument('pidfile', help='pidfile to write')
+    parser.add_argument('--pid', dest='pidfile', default=None,
+        help='pidfile to write')
     self.args = parser.parse_args()
 
-    if args.debug:
+    if self.args.debug:
       root.setLevel(logging.DEBUG)
       ch = logging.StreamHandler(sys.stdout)
       ch.setLevel(logging.DEBUG)
@@ -59,25 +62,20 @@ class Stage(object):
     credentials = pika.PlainCredentials(mq['username'], mq['password'])
     self.connection = pika.BlockingConnection(
         pika.ConnectionParameters(mq['host'], credentials=credentials))
-    if self.result_queue:
-      self.result_channel = self.connection.channel()
+    self.result_channel = self.connection.channel()
     logging.info('Started %s', self.name)
+    self.started = True
 
   def shutdown(self):
     logging.info('Terminating %s', self.name)
     # This closes channels as well
     self.connection.close()
-    self.connection = None
-    self.result_channel = None
-    self.task_channel = None
 
   def push(self, action, expire=None):
-    if not self.result_channel:
-      return
     properties = pika.BasicProperties(
         expiration=str(expire) if expire else None)
     self.result_channel.basic_publish(
-        exchange='', routing_key=self.result_queue,
+        exchange='', routing_key=action.get_queue(self.args.instance),
         body=pickle.dumps(action, protocol=pickle.HIGHEST_PROTOCOL),
         properties=properties)
 
@@ -89,45 +87,45 @@ class Stage(object):
     try:
       self._task_callback(channel, method, properties, body)
     except Exception, e:
-      #dhmon.metric(
-      #    'snmpcollector.task.exceptions.str', str(e), hostname=self.name)
       logging.exception('Unhandled exception in task loop:')
+    finally:
+      # Ack now, if we die during sending we will hopefully not crash loop
+      channel.basic_ack(delivery_tag=method.delivery_tag)
 
   def _task_callback(self, channel, method, properties, body):
     action = pickle.loads(body)
     if not isinstance(action, actions.Action):
       logging.error('Got non-action in task queue: %s', repr(body))
-      channel.basic_ack(delivery_tag=method.delivery_tag)
       return
 
-    # Buffer up on all outgoing actions to ack only when we're done
-    action_generator = action.do(self)
-    actions = list(action_generator) if action_generator else []
-
-    # Ack now, if we die during sending we will hopefully not crash loop
-    channel.basic_ack(delivery_tag=method.delivery_tag)
-    for action in actions:
+    generator = action.do(self)
+    if not generator:
+      return
+    for action in generator:
       self.push(action)
 
   def run(self):
     if not self.listen_to:
       raise ValueError('Cannot run a stage that lacks an input queue')
 
+    if not self.started:
+      self.startup()
+
     if self.args.debug:
-      self._internal_run(args.pidfile)
+      self._internal_run()
     else:
       import daemon
       with daemon.DaemonContext():
-        self._internal_run(args.pidfile)
+        self._internal_run()
 
   def purge(self, action_cls):
     channel = self.connection.channel()
-    task_queue = action_cls.get_queue(args.instance)
+    task_queue = action_cls.get_queue(self.args.instance)
     channel.queue_declare(queue=task_queue)
     channel.queue_purge(queue=task_queue)
     logging.debug('Purged queue %s', task_queue)
 
-  def _internal_run(self, pidfile):
+  def _internal_run(self):
     logging.info('Starting %s', self.name)
 
     try:
@@ -136,33 +134,28 @@ class Stage(object):
     except ImportError:
       pass
 
-    with open(pidfile, 'w') as f:
-      f.write(str(os.getpid()))
+    if self.args.pidfile:
+      with open(self.args.pidfile, 'w') as f:
+        f.write(str(os.getpid()))
 
-    # On error, restart this thread
-    running = True
-    while running:
-      self.startup()
+    self.task_channel = self.connection.channel()
+    self.task_channel.basic_qos(prefetch_count=1)
 
-      self.task_channel = self.connection.channel()
-      self.task_channel.basic_qos(prefetch_count=1)
+    for action_cls in self.listen_to:
+      task_queue = action_cls.get_queue(self.args.instance)
+      self.task_channel.queue_declare(queue=task_queue)
+      self.task_channel.basic_consume(
+          self._task_wrapper_callback, queue=task_queue)
+      logging.debug('Listening to queue %s', task_queue)
 
-      for action_cls in self.listen_to:
-        task_queue = action_cls.get_queue(args.instance)
-        self.task_channel.queue_declare(queue=task_queue)
-        self.task_channel.basic_consume(
-            self._task_wrapper_callback, queue=task_queue)
-        logging.debug('Listening to queue %s', task_queue)
+    try:
+      self.task_channel.start_consuming()
+    except KeyboardInterrupt:
+      logging.error('Keyboard interrupt, shutting down..')
+    except Exception, e:
+      logging.exception('Unhandled exception, restarting stage')
 
-      try:
-        self.task_channel.start_consuming()
-      except KeyboardInterrupt:
-        logging.error('Keyboard interrupt, shutting down..')
-        running = False
-      except Exception, e:
-        logging.exception('Unhandled exception, restarting stage')
-
-      try:
-        self.shutdown()
-      except Exception, e:
-        logging.exception('Exception in shutdown')
+    try:
+      self.shutdown()
+    except Exception, e:
+      logging.exception('Exception in shutdown')
