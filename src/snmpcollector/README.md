@@ -34,11 +34,16 @@ OIDs and if the device has VLAN aware OIDs it will walk those afterwards.
 The raw walk output is then pushed to the next step in the pipeline as a
 SaveAction.
 
-## Saver
+## Annotator
 
-This is a single instance that reads all the SNMP results and exports
-them in a Prometheus compatible way. Most of the work is to parse the
-data to get good labels.
+This stage reads all the SNMP results and exports them in a Prometheus
+compatible way. Most of the work is to parse the data to get good labels.
+
+## Exporter
+
+A single instance responsible for collecting all the results and exporting
+them via Prometheus. The future will add a gRPC interface to allow other
+services to query data such as blobs and metrics that we have collected.
 
 # Installation
 
