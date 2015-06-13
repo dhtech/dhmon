@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 import BaseHTTPServer
+import SocketServer
 import base64
 import logging
 import prometheus_client
@@ -9,7 +10,6 @@ import time
 import actions
 import collections
 import config
-import copy
 import stage
 
 
@@ -44,7 +44,8 @@ class Exporter(stage.Stage):
   def __init__(self):
     super(Exporter, self).__init__()
     self.metrics = {}
-    self.export_lock = threading.Lock()
+    self.metrics_copy = {}
+    self.copy_lock = threading.Lock()
     self.summaries = {}
     self.seen_targets = collections.defaultdict(set)
 
@@ -53,7 +54,7 @@ class Exporter(stage.Stage):
     SUMMARIES_COUNT.set(len(self.summaries))
 
   def do_result(self, target, results, stats):
-    with self.export_lock:
+    with self.copy_lock:
       self._save(target, results)
 
     timestamp = target.timestamp
@@ -104,30 +105,39 @@ class Exporter(stage.Stage):
       # Just ignore this for now.
       return
     labels[(
-      target.host, result.index, result.interface,
+      target.host, target.layer, result.index, result.interface,
       result.vlan, result.data.type)] = (
           result.data.value, target.timestamp)
 
-  def write_metrics(self, out):
-    # Since the label map will be mutated we need to do a deep copy here.
-    with self.export_lock:
-      metrics_copy = copy.deepcopy(self.metrics)
+  def run_dump(self):
+    while True:
+      # Since the label map will be mutated we need to do a deep copy here.
+      with self.copy_lock:
+        metrics_copy = {}
+        for obj, (mib, type, labels) in self.metrics.iteritems():
+          metrics_copy[obj] = (mib, type, dict(labels))
+      self.metrics_copy = metrics_copy
+      time.sleep(10)
 
-    for obj, (mib, metrics_type, labels_map) in metrics_copy.iteritems():
+  def write_metrics(self, out):
+    for obj, (mib, metrics_type, labels_map) in self.metrics_copy.iteritems():
       if metrics_type != 'counter' and metrics_type != 'gauge':
         continue
       out.write('# HELP {0} {1}::{0}\n'.format(obj, mib))
       out.write('# TYPE {0} {1}\n'.format(obj, metrics_type))
-      for (host, index, interface, vlan, type), (value, timestamp) in (
+      for (host, layer, index, interface, vlan, type), (value, timestamp) in (
           labels_map.iteritems()):
-        instance = obj
-        instance += '{'
-        instance += 'device="{0}",'.format(host)
-        instance += 'index="{0}",'.format(index)
-        instance += 'interface="{0}",'.format(interface)
-        instance += 'vlan="{0}",'.format(vlan)
-        instance += 'type="{0}"'.format(type)
-        instance += '}'
+        instance = ''.join([
+          obj,
+          '{',
+          'device="{0}",'.format(host),
+          'layer="{0}",'.format(layer),
+          'index="{0}",'.format(index),
+          'interface="{0}",'.format(interface),
+          'vlan="{0}",'.format(vlan),
+          'type="{0}"'.format(type),
+          '}'
+        ])
         out.write('{0} {1} {2}\n'.format(
           instance, value, int(timestamp * 1000)))
 
@@ -149,11 +159,20 @@ if __name__ == '__main__':
     def log_message(self, format, *args):
       return
 
+
+  class ThreadedHTTPServer(
+      SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+    pass
+
   class PrometheusMetricsServer(threading.Thread):
     def run(self):
-      httpd = BaseHTTPServer.HTTPServer(('', HTTP_SNMP_PORT), MetricsHandler)
+      httpd = ThreadedHTTPServer(('', HTTP_SNMP_PORT), MetricsHandler)
       httpd.serve_forever()
   t = PrometheusMetricsServer()
+  t.daemon = True
+  t.start()
+
+  t = threading.Thread(target=stage.run_dump)
   t.daemon = True
   t.start()
 
