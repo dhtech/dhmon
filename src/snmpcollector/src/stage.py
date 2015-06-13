@@ -24,14 +24,15 @@ class Stage(object):
   def __init__(self):
     self.name = self.__class__.__name__
     self.listen_to = set()
+    self.to_purge = set()
     self.task_channel = None
     self.result_channel = None
     self.connection = None
     self.args = None
     self.started = False
+    self._setup()
 
-  def startup(self):
-    assert not self.started
+  def _setup(self):
     root = logging.getLogger()
     root.addHandler(logging.handlers.SysLogHandler('/dev/log'))
     root.setLevel(logging.INFO)
@@ -57,7 +58,9 @@ class Stage(object):
           '%(levelname)s - %(message)s' )
       ch.setFormatter(formatter)
       root.addHandler(ch)
- 
+
+  def startup(self):
+    assert not self.started
     mq = config.get('mq')
     credentials = pika.PlainCredentials(mq['username'], mq['password'])
     self.connection = pika.BlockingConnection(
@@ -78,7 +81,6 @@ class Stage(object):
         exchange='', routing_key=action.get_queue(self.args.instance),
         body=pickle.dumps(action, protocol=pickle.HIGHEST_PROTOCOL),
         properties=properties)
-
 
   def listen(self, action_cls):
     self.listen_to.add(action_cls)
@@ -108,9 +110,6 @@ class Stage(object):
     if not self.listen_to:
       raise ValueError('Cannot run a stage that lacks an input queue')
 
-    if not self.started:
-      self.startup()
-
     if self.args.debug:
       self._internal_run()
     else:
@@ -119,14 +118,13 @@ class Stage(object):
         self._internal_run()
 
   def purge(self, action_cls):
-    channel = self.connection.channel()
-    task_queue = action_cls.get_queue(self.args.instance)
-    channel.queue_declare(queue=task_queue)
-    channel.queue_purge(queue=task_queue)
-    logging.debug('Purged queue %s', task_queue)
+    self.to_purge.add(action_cls)
 
   def _internal_run(self):
     logging.info('Starting %s', self.name)
+
+    # Needs to set up after daemonization
+    self.startup()
 
     try:
       import procname
@@ -140,6 +138,12 @@ class Stage(object):
 
     self.task_channel = self.connection.channel()
     self.task_channel.basic_qos(prefetch_count=1)
+
+    for action_cls in self.to_purge:
+      task_queue = action_cls.get_queue(self.args.instance)
+      self.task_channel.queue_declare(queue=task_queue)
+      self.task_channel.queue_purge(queue=task_queue)
+      logging.debug('Purged queue %s', task_queue)
 
     for action_cls in self.listen_to:
       task_queue = action_cls.get_queue(self.args.instance)

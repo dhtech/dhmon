@@ -26,7 +26,7 @@ ERROR_COUNT = prometheus_client.Counter(
     'snmp_error_count', 'Number of errors', ('device',))
 
 TIMEOUT_COUNT = prometheus_client.Counter(
-    'snmp_error_count', 'Number of timeouts', ('device',))
+    'snmp_timeout_count', 'Number of timeouts', ('device',))
 
 OID_COUNT = prometheus_client.Gauge(
     'snmp_oid_count', 'Number of OIDs exported', ('device',))
@@ -80,17 +80,22 @@ class Exporter(stage.Stage):
 
   def export(self, target, result):
     metric = self.metrics.get(result.obj, None)
+    if result.data.type == 'COUNTER64' or result.data.type == 'COUNTER':
+      metric_type = 'counter'
+    elif result.data.type in self.NUMERIC_TYPES:
+      metric_type = 'gauge'
+    else:
+      metric_type = 'blob'
+
     if not metric:
-      if result.data.type == 'COUNTER64' or result.data.type == 'COUNTER':
-        metric_type = 'counter'
-      elif result.data.type in self.NUMERIC_TYPES:
-        metric_type = 'gauge'
-      else:
-        metric_type = 'blob'
       metric = (result.mib, metric_type, {})
       self.metrics[result.obj] = metric
 
-    _, _, labels = self.metrics[result.obj]
+    _, saved_metric_type, labels = self.metrics[result.obj]
+    if metric_type != saved_metric_type:
+      # This happens if we have a collision somewhere ('local' is common)
+      # Just ignore this for now.
+      return
     labels[(
       target.host, result.index, result.interface,
       result.vlan, result.data.type)] = (

@@ -6,7 +6,6 @@ import time
 
 import actions
 import config
-import mibresolver
 import stage
 
 
@@ -16,6 +15,13 @@ class Annotator(stage.Stage):
   def __init__(self):
     super(Annotator, self).__init__()
     self.mibcache = {}
+    self.mibresolver = None
+
+  def startup(self):
+    super(Annotator, self).startup()
+    # Do the import here to not spam the terminal with netsnmp stuff
+    import mibresolver
+    self.mibresolver = mibresolver
 
   def do_result(self, target, results, stats):
     if_oids = config.get('annotator', 'annotate-oids-with-iface')
@@ -41,7 +47,7 @@ class Annotator(stage.Stage):
 
       name = self.mibcache.get(oid, None)
       if name is None:
-        name = mibresolver.resolve(oid)
+        name = self.mibresolver.resolve(oid)
         self.mibcache[oid] = name
 
       if name is None:

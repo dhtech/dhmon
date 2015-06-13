@@ -48,7 +48,6 @@ class Supervisor(stage.Stage):
 
 if __name__ == '__main__':
   stage = Supervisor()
-  stage.startup()
   stage.purge(actions.Trigger)
   stage.listen(actions.Trigger)
   stage.run()
