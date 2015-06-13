@@ -54,5 +54,6 @@ else:
   for action in worker_stage.do_snmp_walk(target):
     for key in sorted(action.results.keys()):
       print >>sys.stderr, key, action.results[key]
+    logging.info('Run stats: %s', action.stats)
 
 logging.info('Duration: %s', time.time() - start)

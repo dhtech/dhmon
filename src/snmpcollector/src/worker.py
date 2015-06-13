@@ -5,8 +5,44 @@ import re
 
 import actions
 import config
+import multiprocessing
 import snmp
 import stage
+
+
+# How many sub-workers to spawn to enumerate VLAN OIDs
+VLAN_MAP_POOL = 10
+
+
+def _poll(data):
+  """Helper function that is run in a multiprocessing pool.
+
+  This is to make VLAN context polls much faster.
+  Some contexts doesn't exist and will just time out, which takes
+  a loong time. So we run them in parallel.
+  """
+  target, vlan, oid = data
+  logging.debug('Collecting %s on %s @ %s', oid, target.host, vlan)
+  errors = 0
+  timeouts = 0
+  if not oid.startswith('.1'):
+    logging.warning(
+        'OID %s does not start with .1, please verify configuration', oid)
+    return
+  results = {}
+  try:
+    results.update(target.walk(oid, vlan))
+  except snmp.TimeoutError, e:
+    timeouts += 1
+    if vlan:
+      logging.debug(
+          'Timeout, is switch configured for VLAN SNMP context? %s', e)
+    else:
+      logging.debug('Timeout, slow switch? %s', e)
+  except snmp.Error, e:
+    errors += 1
+    logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
+  return results, errors, timeouts
 
 
 class Worker(stage.Stage):
@@ -61,7 +97,7 @@ class Worker(stage.Stage):
 
   def do_snmp_walk(self, target):
     ret = self._walk(target)
-    results, timeouts, errors = ret if not ret is None else ({}, 0, 1)
+    results, errors, timeouts = ret if not ret is None else ({}, 0, 1)
 
     logging.debug('Done SNMP poll (%d objects) for "%s"',
         len(results.keys()), target.host)
@@ -92,27 +128,20 @@ class Worker(stage.Stage):
       errors += 1
       logging.warning('Could not list VLANs: %s', str(e))
 
-    results = {}
+    to_poll = []
     for vlan in list(vlans):
       oids = vlan_oids if vlan else global_oids
       for oid in oids:
-        logging.debug('Collecting %s on %s @ %s', oid, target.host, vlan)
-        if not oid.startswith('.1'):
-          logging.warning(
-              'OID %s does not start with .1, please verify configuration', oid)
-          continue
-        try:
-          results.update(self.do_overrides(target.walk(oid, vlan)))
-        except snmp.TimeoutError, e:
-          timeouts += 1
-          if vlan:
-            logging.debug(
-                'Timeout, is switch configured for VLAN SNMP context? %s', e)
-          else:
-            logging.debug('Timeout, slow switch? %s', e)
-        except snmp.Error, e:
-          errors += 1
-          logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
+        to_poll.append((target, vlan, oid))
+
+    results = {}
+
+    pool = multiprocessing.Pool(processes=VLAN_MAP_POOL)
+    for part_results, part_errors, part_timeouts in pool.imap(
+        _poll, to_poll):
+      results.update(self.do_overrides(part_results))
+      errors += part_errors
+      timeouts += part_timeouts
     return results, errors, timeouts
 
 
