@@ -1,0 +1,10 @@
+
+# snmpcollector only supports one supervisor
+SNMP_SUPERVISORS=1
+
+# How many workers to use that will poll devices
+SNMP_WORKERS=50
+
+# snmpcollector only supports one saver
+SNMP_SAVERS=1
+
