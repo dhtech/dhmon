@@ -134,6 +134,9 @@ class Exporter(stage.Stage):
 
 if __name__ == '__main__':
   stage = Exporter()
+  # TODO(bluecmd): This seems to be a bit unstable. I never got this to
+  # work in daemon mode, which is odd. I need to debug this more.
+  # For now, run the exporter like 'python src/exporter.py -d'
 
   class MetricsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
