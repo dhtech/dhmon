@@ -106,21 +106,13 @@ class Stage(object):
     for action in generator:
       self.push(action)
 
+  def purge(self, action_cls):
+    self.to_purge.add(action_cls)
+
   def run(self):
     if not self.listen_to:
       raise ValueError('Cannot run a stage that lacks an input queue')
 
-    if self.args.debug:
-      self._internal_run()
-    else:
-      import daemon
-      with daemon.DaemonContext():
-        self._internal_run()
-
-  def purge(self, action_cls):
-    self.to_purge.add(action_cls)
-
-  def _internal_run(self):
     logging.info('Starting %s', self.name)
 
     # Needs to set up after daemonization

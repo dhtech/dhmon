@@ -48,7 +48,7 @@ stage() {
     PIDFILE=$DHMONRUN/snmp.$name.$i.pid
     if [[ "$action" == "start" ]]; then
       echo -n " $i"
-      start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE \
+      start-stop-daemon -b --start --oknodo --pidfile $PIDFILE \
         --startas $DHMON/src/snmpcollector/src/$script -- --pid $PIDFILE
       ret=$?
     elif [[ "$action" == "stop" ]]; then
@@ -77,7 +77,7 @@ case $1 in
     stage 'start' 'supervisor' 'supervisor.py' "${SNMP_SUPERVISORS}"
     stage 'start' 'worker'     'worker.py'     "${SNMP_WORKERS}"
     stage 'start' 'annotator'  'annotator.py'  "${SNMP_ANNOTATORS}"
-    stage 'start' 'saver'      'exporter.py'   "${SNMP_EXPORTERS}"
+    stage 'start' 'exporter'   'exporter.py'   "${SNMP_EXPORTERS}"
     ;;
   stop)
     stage 'stop' 'supervisor'  'supervisor.py' "${SNMP_SUPERVISORS}"
