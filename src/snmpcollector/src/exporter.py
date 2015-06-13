@@ -20,6 +20,10 @@ ROUND_LATENCY = prometheus_client.Summary(
     'snmp_round_latency_seconds',
     'Time it takes to complete one round of SNMP polls')
 
+DEVICE_LATENCY = prometheus_client.Summary(
+    'snmp_device_latency_seconds',
+    'Time it takes to complete one device SNMP poll', ('device', ))
+
 SUMMARIES_COUNT = prometheus_client.Gauge(
     'snmp_summaries_count', 'Number of in-flight polls')
 
@@ -52,11 +56,14 @@ class Exporter(stage.Stage):
     with self.export_lock:
       self._save(target, results)
 
+    timestamp = target.timestamp
+    latency = time.time() - timestamp
+
     ERROR_COUNT.labels(target.host).inc(stats.errors)
     TIMEOUT_COUNT.labels(target.host).inc(stats.timeouts)
+    DEVICE_LATENCY.labels(target.host).observe(latency)
 
     # Try to see if we're done with this round
-    timestamp = target.timestamp
     self.seen_targets[timestamp].add(target)
     max_targets = self.summaries.get(timestamp, None)
     if max_targets is None:
@@ -64,7 +71,6 @@ class Exporter(stage.Stage):
 
     if len(self.seen_targets[timestamp]) == max_targets:
       # We're done! Record the latency
-      latency = time.time() - timestamp
       ROUND_LATENCY.observe(latency)
       logging.info('Latency is currently %d', latency)
       del self.summaries[timestamp]
