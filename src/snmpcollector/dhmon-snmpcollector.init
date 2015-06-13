@@ -49,7 +49,7 @@ stage() {
     if [[ "$action" == "start" ]]; then
       echo -n " $i"
       start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE \
-        --startas $DHMON/src/snmpcollector/src/$script -- $PIDFILE
+        --startas $DHMON/src/snmpcollector/src/$script -- --pid $PIDFILE
       ret=$?
     elif [[ "$action" == "stop" ]]; then
       echo -n " $i"
@@ -75,15 +75,15 @@ case $1 in
   start)
     mkdir -p $DHMONRUN
     stage 'start' 'supervisor' 'supervisor.py' "${SNMP_SUPERVISORS}"
-    stage 'start' 'worker'     'snmp_worker.py' "${SNMP_WORKERS}"
-    stage 'start' 'processor'  'result_processor.py' "${SNMP_PROCESSORS}"
-    stage 'start' 'saver'      'result_saver.py' "${SNMP_SAVERS}"
+    stage 'start' 'worker'     'worker.py'     "${SNMP_WORKERS}"
+    stage 'start' 'annotator'  'annotator.py'  "${SNMP_ANNOTATORS}"
+    stage 'start' 'saver'      'exporter.py'   "${SNMP_EXPORTERS}"
     ;;
   stop)
-    stage 'stop' 'supervisor' 'supervisor.py' "${SNMP_SUPERVISORS}"
-    stage 'stop' 'worker'     'snmp_worker.py' "${SNMP_WORKERS}"
-    stage 'stop' 'processor'  'result_processor.py' "${SNMP_PROCESSORS}"
-    stage 'stop' 'saver'      'result_saver.py' "${SNMP_SAVERS}"
+    stage 'stop' 'supervisor'  'supervisor.py' "${SNMP_SUPERVISORS}"
+    stage 'stop' 'worker'      'worker.py'     "${SNMP_WORKERS}"
+    stage 'stop' 'annotator'   'annotator.py'  "${SNMP_ANNOTATORS}"
+    stage 'stop' 'exporter'    'exporter.py'   "${SNMP_EXPORTERS}"
     ;;
   restart|force-reload)
     $0 stop && sleep 2 && $0 start
@@ -99,10 +99,10 @@ case $1 in
     exit 3
     ;;
   status)
-    stage 'status' 'supervisor' 'supervisor.py' "${SNMP_SUPERVISORS}"
-    stage 'status' 'worker'     'snmp_worker.py' "${SNMP_WORKERS}"
-    stage 'status' 'processor'  'result_processor.py' "${SNMP_PROCESSORS}"
-    stage 'status' 'saver'      'result_saver.py' "${SNMP_SAVERS}"
+    stage 'status' 'supervisor'  'supervisor.py' "${SNMP_SUPERVISORS}"
+    stage 'status' 'worker'      'worker.py'     "${SNMP_WORKERS}"
+    stage 'status' 'annotator'   'annotator.py'  "${SNMP_ANNOTATORS}"
+    stage 'status' 'exporter'    'exporter.py'   "${SNMP_EXPORTERS}"
     ;;
   *)
     echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"

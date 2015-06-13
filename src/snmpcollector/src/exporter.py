@@ -12,8 +12,8 @@ import config
 import stage
 
 
-HTTP_MAIN_PORT = 13200
-HTTP_SNMP_PORT = 13201
+HTTP_MAIN_PORT = 13100
+HTTP_SNMP_PORT = 13101
 
 ROUND_LATENCY = prometheus_client.Summary(
     'snmp_round_latency_seconds',
