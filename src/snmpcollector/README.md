@@ -40,17 +40,25 @@ This is a single instance that reads all the SNMP results and exports
 them in a Prometheus compatible way. Most of the work is to parse the
 data to get good labels.
 
-# Dependencies
+# Installation
 
     apt-get install python-pip python-netsnmp python-pika
     pip install prometheus_client
+    cp etc/dhmon.default /etc/defaults/
+    cp etc/snmpcollector.yaml /etc/
 
 Use libsnmp30 and python-netsnmp (required for SNMPv3)
 Use python-pika >= 0.9.14 (weird framing error otherwise)
 
 # Management
 
+Start:
+    sudo /etc/init.d/dhmon-snmpcollector start
+
 Selective restart:
-sudo LIMITRESTART=worker /etc/init.d/dhmon-snmpcollector restart
+    sudo LIMITRESTART=worker /etc/init.d/dhmon-snmpcollector restart
+
+SNMP configuration and reachability test:
+    ./snmptest d01-a.event.dreamhack.local
 
 Configuration is read every minute and reloaded internally if it's different.
