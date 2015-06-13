@@ -1,10 +1,19 @@
 Scratch notes for prometheus
 
 ./node_exporter  -web.listen-address=':13000' -collectors.enabled='diskstats,filesystem,loadavg,meminfo,stat,textfile,time,netdev,netstat,bonding,lastlogin,ntp' -collector.ntp.server='localhost'
- GOMAXPROCS=8 ./prometheus  -web.listen-address=:9090  -web.path-prefix='/prometheus/' -storage.local.path=/srv/metrics
 
-ProxyPass /prometheus http://localhost:9090/prometheus
-ProxyPass /mq http://localhost:15672
+GOMAXPROCS=8 ./prometheus  -web.listen-address=:9090  -web.path-prefix='/prometheus/' -storage.local.path=/srv/metrics -alertmanager.url='http://localhost:9093'
+ ./alertmanager -config.file alertmanager.conf -web.path-prefix='/alertmanager/'
+
+
+
+    ProxyPass /prometheus http://localhost:9090/prometheus
+    ProxyPass /alertmanager http://localhost:9093/alertmanager
+    ProxyPass /mq http://localhost:15672
+    ProxyPass /dash http://localhost:3000/dash
+
+    Header always set Strict-Transport-Security "max-age=63072000; preload"
+
 
 rabbitmq-plugins enable rabbitmq_management
 
