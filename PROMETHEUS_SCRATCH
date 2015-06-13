@@ -2,7 +2,7 @@ Scratch notes for prometheus
 
 ./node_exporter  -web.listen-address=':13000' -collectors.enabled='diskstats,filesystem,loadavg,meminfo,stat,textfile,time,netdev,netstat,bonding,lastlogin,ntp' -collector.ntp.server='localhost'
 
-GOMAXPROCS=8 ./prometheus  -web.listen-address=:9090  -web.path-prefix='/prometheus/' -storage.local.path=/srv/metrics -alertmanager.url='http://localhost:9093'
+GOMAXPROCS=8 ./prometheus  -web.listen-address=:9090  -web.path-prefix='/prometheus/' -storage.local.path=/srv/metrics -alertmanager.url='http://localhost:9093/alertmanager'
  ./alertmanager -config.file alertmanager.conf -web.path-prefix='/alertmanager/'
 
 
