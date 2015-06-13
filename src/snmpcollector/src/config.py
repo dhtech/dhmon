@@ -1,3 +1,4 @@
+import logging
 import time
 import yaml
 
@@ -27,7 +28,7 @@ def refresh():
     if new_config == _config:
       return
   except Exception:
-    logger.exception('Exception while reading new config, ignoring')
+    logging.exception('Exception while reading new config, ignoring')
     return
 
   incarnation += 1
