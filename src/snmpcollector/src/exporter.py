@@ -9,6 +9,7 @@ import time
 import actions
 import collections
 import config
+import copy
 import stage
 
 
@@ -102,10 +103,9 @@ class Exporter(stage.Stage):
           result.data.value, target.timestamp)
 
   def write_metrics(self, out):
-    # We only care about the list structure and its references so a
-    # shallow copy is fine here. The data is imutable anyway.
+    # Since the label map will be mutated we need to do a deep copy here.
     with self.export_lock:
-      metrics_copy = dict(self.metrics)
+      metrics_copy = copy.deepcopy(self.metrics)
 
     for obj, (mib, metrics_type, labels_map) in metrics_copy.iteritems():
       if metrics_type != 'counter' and metrics_type != 'gauge':
