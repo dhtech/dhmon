@@ -11,7 +11,7 @@ import stage
 
 
 # How many sub-workers to spawn to enumerate VLAN OIDs
-VLAN_MAP_POOL = 10
+VLAN_MAP_POOL = 5
 
 
 def _poll(data):
@@ -51,6 +51,7 @@ class Worker(stage.Stage):
     super(Worker, self).__init__()
     self.model_oid_cache = {}
     self.model_oid_cache_incarnation = 0
+    self.pool = multiprocessing.Pool(processes=VLAN_MAP_POOL)
 
   def gather_oids(self, target, model):
     if config.incarnation != self.model_oid_cache_incarnation:
@@ -135,9 +136,7 @@ class Worker(stage.Stage):
         to_poll.append((target, vlan, oid))
 
     results = {}
-
-    pool = multiprocessing.Pool(processes=VLAN_MAP_POOL)
-    for part_results, part_errors, part_timeouts in pool.imap(
+    for part_results, part_errors, part_timeouts in self.pool.imap(
         _poll, to_poll):
       results.update(self.do_overrides(part_results))
       errors += part_errors
