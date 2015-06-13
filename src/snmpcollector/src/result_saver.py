@@ -67,6 +67,9 @@ class ResultSaver(stage.Stage):
     for oid, result in results.iteritems():
       # Record some stats on how long time it took to get this metric
       elapsed = (time.time() - target.timestamp) * 1000 * 1000
+      vlan = ''
+      if '@' in oid:
+        oid, vlan = oid.split('@')
 
       name = self.mibcache.get(oid, None)
       if name is None:
@@ -88,13 +91,13 @@ class ResultSaver(stage.Stage):
           break
 
       value = result.value
-      self.export(target, result, mib, obj, index, interface)
+      self.export(target, result, mib, obj, index, interface, vlan)
       saved += 1
 
     # Save collection stats
     logging.debug('Save completed for %d metrics for %s', saved, target.host)
 
-  def export(self, target, result, mib, obj, index, interface):
+  def export(self, target, result, mib, obj, index, interface, vlan):
     metric = self.metrics.get(obj, None)
     if not metric:
       if result.type == 'COUNTER64' or result.type == 'COUNTER':
@@ -107,7 +110,7 @@ class ResultSaver(stage.Stage):
       self.metrics[obj] = metric
 
     _, _, labels = self.metrics[obj]
-    labels[(target.host, index, interface, result.type)] = (
+    labels[(target.host, index, interface, vlan, result.type)] = (
         result.value, target.timestamp)
 
   def write_metrics(self, out):
@@ -117,13 +120,14 @@ class ResultSaver(stage.Stage):
           continue
         out.write('# HELP {0} {1}::{0}\n'.format(obj, mib))
         out.write('# TYPE {0} {1}\n'.format(obj, metrics_type))
-        for (host, index, interface, type), (value, timestamp) in (
+        for (host, index, interface, vlan, type), (value, timestamp) in (
             labels_map.iteritems()):
           instance = obj
           instance += '{'
           instance += 'device="{0}",'.format(host)
           instance += 'index="{0}",'.format(index)
           instance += 'interface="{0}",'.format(interface)
+          instance += 'vlan="{0}",'.format(vlan)
           instance += 'type="{0}"'.format(type)
           instance += '}'
           out.write('{0} {1} {2}\n'.format(
