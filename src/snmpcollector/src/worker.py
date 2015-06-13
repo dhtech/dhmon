@@ -5,7 +5,7 @@ import re
 
 import actions
 import config
-import target
+import snmp
 import stage
 
 
@@ -55,14 +55,22 @@ class Worker(stage.Stage):
     for oid, result in results.iteritems():
       root = '.'.join(oid.split('.')[:-1])
       if root in overridden_oids:
-        overriden_results[oid] = target.ResultTuple(
+        overriden_results[oid] = snmp.ResultTuple(
             result.value, overrides[root])
     return overriden_results
 
   def do_snmp_walk(self, target):
+    ret = self._walk(target)
+    results, timeouts, errors = ret if not ret is None else ({}, 0, 1)
+
+    logging.debug('Done SNMP poll (%d objects) for "%s"',
+        len(results.keys()), target.host)
+    yield actions.Result(target, results, actions.Statistics(timeouts, errors))
+
+  def _walk(self, target):
     try:
       model = target.model()
-    except target.Error, e:
+    except snmp.Error, e:
       logging.exception('Could not determine model of %s:', target.host)
       return
     if not model:
@@ -80,7 +88,7 @@ class Worker(stage.Stage):
     try:
       if vlan_oids:
         vlans.update(target.vlans())
-    except target.Error, e:
+    except snmp.Error, e:
       errors += 1
       logging.warning('Could not list VLANs: %s', str(e))
 
@@ -95,20 +103,17 @@ class Worker(stage.Stage):
           continue
         try:
           results.update(self.do_overrides(target.walk(oid, vlan)))
-        except target.TimeoutError, e:
+        except snmp.TimeoutError, e:
           timeouts += 1
           if vlan:
             logging.debug(
                 'Timeout, is switch configured for VLAN SNMP context? %s', e)
           else:
             logging.debug('Timeout, slow switch? %s', e)
-        except target.Error, e:
+        except snmp.Error, e:
           errors += 1
           logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
- 
-    logging.debug('Done SNMP poll (%d objects) for "%s"',
-        len(results.keys()), target.host)
-    yield actions.Result(target, results, actions.Statistics(timeouts, errors))
+    return results, errors, timeouts
 
 
 if __name__ == '__main__':

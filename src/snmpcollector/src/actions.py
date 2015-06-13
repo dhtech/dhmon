@@ -55,7 +55,7 @@ class Summary(Action):
     self.targets = targets
 
   def do(self, stage):
-    return stage.do_summary(timestamp, targets)
+    return stage.do_summary(self.timestamp, self.targets)
 
 
 class Result(Action):

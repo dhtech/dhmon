@@ -5,7 +5,7 @@ import time
 
 import actions
 import config
-import target
+import snmp
 import stage
 
 
@@ -29,7 +29,7 @@ class Supervisor(stage.Stage):
         logging.error('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
         continue
-      yield host, target.SnmpTarget(host, ip, timestamp, layer, **layer_config)
+      yield host, snmp.SnmpTarget(host, ip, timestamp, layer, **layer_config)
 
   def do_trigger(self):
     timestamp = time.time()

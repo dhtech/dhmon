@@ -7,12 +7,29 @@ import threading
 import time
 
 import actions
+import collections
 import config
 import stage
 
 
 HTTP_MAIN_PORT = 13200
 HTTP_SNMP_PORT = 13201
+
+ROUND_LATENCY = prometheus_client.Summary(
+    'snmp_round_latency_seconds',
+    'Time it takes to complete one round of SNMP polls')
+
+SUMMARIES_COUNT = prometheus_client.Gauge(
+    'snmp_summaries_count', 'Number of in-flight polls')
+
+ERROR_COUNT = prometheus_client.Counter(
+    'snmp_error_count', 'Number of errors', ('device',))
+
+TIMEOUT_COUNT = prometheus_client.Counter(
+    'snmp_error_count', 'Number of timeouts', ('device',))
+
+OID_COUNT = prometheus_client.Gauge(
+    'snmp_oid_count', 'Number of OIDs exported', ('device',))
 
 
 class Exporter(stage.Stage):
@@ -23,16 +40,41 @@ class Exporter(stage.Stage):
     super(Exporter, self).__init__()
     self.metrics = {}
     self.export_lock = threading.Lock()
+    self.summaries = {}
+    self.seen_targets = collections.defaultdict(set)
+
+  def do_summary(self, timestamp, targets):
+    self.summaries[timestamp] = targets
+    SUMMARIES_COUNT.set(len(self.summaries))
 
   def do_result(self, target, results, stats):
     with self.export_lock:
       self._save(target, results)
-    # TODO(bluecmd): Record the stats we are given
+
+    ERROR_COUNT.labels(target.host).inc(stats.errors)
+    TIMEOUT_COUNT.labels(target.host).inc(stats.timeouts)
+
+    # Try to see if we're done with this round
+    timestamp = target.timestamp
+    self.seen_targets[timestamp].add(target)
+    max_targets = self.summaries.get(timestamp, None)
+    if max_targets is None:
+      return
+
+    if len(self.seen_targets[timestamp]) == max_targets:
+      # We're done! Record the latency
+      latency = time.time() - timestamp
+      ROUND_LATENCY.observe(latency)
+      logging.info('Latency is currently %d', latency)
+      del self.summaries[timestamp]
+      del self.seen_targets[timestamp]
+      SUMMARIES_COUNT.set(len(self.summaries))
 
   def _save(self, target, results):
     for oid, result in results.iteritems():
       self.export(target, result)
 
+    OID_COUNT.labels(target.host).set(len(results))
     logging.debug('Export completed for %d metrics for %s',
         len(results), target.host)
 
@@ -104,4 +146,5 @@ if __name__ == '__main__':
   prometheus_client.start_http_server(HTTP_MAIN_PORT)
 
   stage.listen(actions.AnnotatedResult)
+  stage.listen(actions.Summary)
   stage.run()
