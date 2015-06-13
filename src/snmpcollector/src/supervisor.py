@@ -3,26 +3,22 @@ import logging
 import sqlite3
 import time
 
+import actions
 import config
-import snmp_target
-import snmp_worker
+import target
 import stage
 
 
-class TriggerAction(stage.Action):
-
-  def do(self, stage):
-    return stage.do_trigger()
-
-
 class Supervisor(stage.Stage):
+  """Single instance target enumerator.
 
-  def __init__(self):
-    super(Supervisor, self).__init__(
-        'supervisor', task_queue='trigger', result_queue='supervisor')
+  When triggered the supervisor will scan ipplan.db to find all
+  targets that should be polled. Every device is then passed as a
+  message to the workers.
+  """
 
   def construct_targets(self, timestamp):
-    db = sqlite3.connect('/etc/ipplan.db')
+    db = sqlite3.connect(config.get('ipplan'))
     cursor = db.cursor()
     sql = ("SELECT h.name, h.ipv4_addr_txt, o.value FROM host h, option o "
         "WHERE o.name = 'layer' AND h.node_id = o.node_id")
@@ -38,16 +34,21 @@ class Supervisor(stage.Stage):
 
   def do_trigger(self):
     timestamp = time.time()
-    # TODO: reinvent this
-    #measure_runtime = stage.MeasureToken(name="runtime", blocker=True)
-    #measure_congestion = stage.MeasureToken(name="congestion", blocker=False)
 
+    targets = 0
     for host, target in self.construct_targets(timestamp):
-      yield snmp_worker.SnmpWalkAction(target)
+      targets += 1
+      yield actions.SnmpWalk(target)
+
+    # Record how many targets there are in this round to make it
+    # possible to record pipeline latency
+    yield actions.Finish(timestamp, targets)
 
     logging.info('New work pushed')
 
 
 if __name__ == '__main__':
   stage = Supervisor()
-  stage.run(purge_task_queue=True)
+  stage.purge(actions.Trigger)
+  stage.listen(actions.Trigger)
+  stage.run()

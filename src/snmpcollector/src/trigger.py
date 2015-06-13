@@ -1,15 +1,13 @@
 #!/usr/bin/env python2
 import stage
-import supervisor
+import actions
 
 
 class Trigger(stage.Stage):
-
-  def __init__(self):
-    super(Trigger, self).__init__('trigger', result_queue='trigger')
+  pass
 
 
 if __name__ == '__main__':
   stage = Trigger()
   stage.startup()
-  stage.push(supervisor.TriggerAction(), expire=5000)
+  stage.push(actions.Trigger(), expire=5000)

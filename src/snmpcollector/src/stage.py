@@ -1,4 +1,3 @@
-import abc
 import argparse
 import logging
 import logging.handlers
@@ -8,16 +7,8 @@ import pika
 import sys
 import time
 
+import actions
 import config
-
-class Action(object):
-  """Base class that represents an Action that moves between stages."""
-  __metadata__ = abc.ABCMeta
-
-  @abc.abstractmethod
-  def do(self, stage):
-    """Execute an action, return a list of result actions."""
-    pass
 
 
 class Stage(object):
@@ -30,15 +21,40 @@ class Stage(object):
   stage (class instance) as a parameter.
   """
 
-  def __init__(self, name, task_queue=None, result_queue=None):
-    self.name = name
-    self.task_queue = 'dhmon:snmp:%s' % task_queue if task_queue else None
-    self.result_queue = 'dhmon:snmp:%s' % result_queue if result_queue else None
+  def __init__(self):
+    self.name = self.__class__.__name__
+    self.listen_to = set()
     self.task_channel = None
     self.result_channel = None
     self.connection = None
+    self.args = None
 
   def startup(self):
+    root = logging.getLogger()
+    root.addHandler(logging.handlers.SysLogHandler('/dev/log'))
+    root.setLevel(logging.INFO)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-d', '--debug', dest='debug', action='store_const', const=True,
+        default=False, help='do not fork, print output to console')
+    parser.add_argument(
+        '-i', '--instance', dest='instance', default='default',
+        help='specifiy instance id, used to run multiple instances')
+    parser.add_argument('pidfile', help='pidfile to write')
+    self.args = parser.parse_args()
+
+    if args.debug:
+      root.setLevel(logging.DEBUG)
+      ch = logging.StreamHandler(sys.stdout)
+      ch.setLevel(logging.DEBUG)
+      logging.getLogger('pika').setLevel(logging.ERROR)
+
+      formatter = logging.Formatter( '%(asctime)s - %(name)s - '
+          '%(levelname)s - %(message)s' )
+      ch.setFormatter(formatter)
+      root.addHandler(ch)
+ 
     mq = config.get('mq')
     credentials = pika.PlainCredentials(mq['username'], mq['password'])
     self.connection = pika.BlockingConnection(
@@ -65,6 +81,10 @@ class Stage(object):
         body=pickle.dumps(action, protocol=pickle.HIGHEST_PROTOCOL),
         properties=properties)
 
+
+  def listen(self, action_cls):
+    self.listen_to.add(action_cls)
+
   def _task_wrapper_callback(self, channel, method, properties, body):
     try:
       self._task_callback(channel, method, properties, body)
@@ -75,7 +95,7 @@ class Stage(object):
 
   def _task_callback(self, channel, method, properties, body):
     action = pickle.loads(body)
-    if not isinstance(action, Action):
+    if not isinstance(action, actions.Action):
       logging.error('Got non-action in task queue: %s', repr(body))
       channel.basic_ack(delivery_tag=method.delivery_tag)
       return
@@ -89,41 +109,25 @@ class Stage(object):
     for action in actions:
       self.push(action)
 
-  def _setup(self, purge_task_queue):
-    root = logging.getLogger()
-    root.addHandler(logging.handlers.SysLogHandler('/dev/log'))
-    root.setLevel(logging.INFO)
+  def run(self):
+    if not self.listen_to:
+      raise ValueError('Cannot run a stage that lacks an input queue')
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-d', '--debug', dest='debug', action='store_const', const=True,
-        default=False, help='do not fork, print output to console')
-    parser.add_argument('pidfile', help='pidfile to write')
-    args = parser.parse_args()
-
-    if args.debug:
-      root.setLevel(logging.DEBUG)
-      ch = logging.StreamHandler(sys.stdout)
-      ch.setLevel(logging.DEBUG)
-      logging.getLogger('pika').setLevel(logging.ERROR)
-
-      formatter = logging.Formatter( '%(asctime)s - %(name)s - '
-          '%(levelname)s - %(message)s' )
-      ch.setFormatter(formatter)
-      root.addHandler(ch)
-      self._internal_run(args.pidfile, purge_task_queue)
+    if self.args.debug:
+      self._internal_run(args.pidfile)
     else:
       import daemon
       with daemon.DaemonContext():
-        self._internal_run(args.pidfile, purge_task_queue)
+        self._internal_run(args.pidfile)
 
-  def run(self, purge_task_queue=False):
-    if not self.task_queue:
-      raise ValueError('Cannot run a stage that lacks an input queue')
+  def purge(self, action_cls):
+    channel = self.connection.channel()
+    task_queue = action_cls.get_queue(args.instance)
+    channel.queue_declare(queue=task_queue)
+    channel.queue_purge(queue=task_queue)
+    logging.debug('Purged queue %s', task_queue)
 
-    self._setup(purge_task_queue)
-
-  def _internal_run(self, pidfile, purge_task_queue):
+  def _internal_run(self, pidfile):
     logging.info('Starting %s', self.name)
 
     try:
@@ -141,14 +145,15 @@ class Stage(object):
       self.startup()
 
       self.task_channel = self.connection.channel()
-      self.task_channel.queue_declare(queue=self.task_queue)
       self.task_channel.basic_qos(prefetch_count=1)
 
-      if purge_task_queue:
-        self.task_channel.queue_purge(queue=self.task_queue)
+      for action_cls in self.listen_to:
+        task_queue = action_cls.get_queue(args.instance)
+        self.task_channel.queue_declare(queue=task_queue)
+        self.task_channel.basic_consume(
+            self._task_wrapper_callback, queue=task_queue)
+        logging.debug('Listening to queue %s', task_queue)
 
-      self.task_channel.basic_consume(
-          self._task_wrapper_callback, queue=self.task_queue)
       try:
         self.task_channel.start_consuming()
       except KeyboardInterrupt:
