@@ -53,12 +53,15 @@ Use python-pika >= 0.9.14 (weird framing error otherwise)
 # Management
 
 Start:
+
     sudo /etc/init.d/dhmon-snmpcollector start
 
 Selective restart:
+
     sudo LIMITRESTART=worker /etc/init.d/dhmon-snmpcollector restart
 
 SNMP configuration and reachability test:
+
     ./snmptest d01-a.event.dreamhack.local
 
 Configuration is read every minute and reloaded internally if it's different.
