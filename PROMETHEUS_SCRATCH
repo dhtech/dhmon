@@ -5,6 +5,7 @@ Scratch notes for prometheus
 GOMAXPROCS=8 ./prometheus  -web.listen-address=:9090  -web.path-prefix='/prometheus/' -storage.local.path=/srv/metrics -alertmanager.url='http://localhost:9093/alertmanager'
  ./alertmanager -config.file alertmanager.conf -web.path-prefix='/alertmanager/'
 
+PROMDASH_PATH_PREFIX=/dash/ bundle exec rails s
 
 
     ProxyPass /prometheus http://localhost:9090/prometheus
@@ -21,4 +22,6 @@ rabbitmqctl add_user dhtech
 rabbitmqctl set_user_tags dhtech administrator
 rabbitmqctl set_permissions dhtech '.*' '.*' '.*'
 
-ipplan-pinger > /var/tmp/export/ipplan-pinger.prom
+watch -n30 src/trigger.py
+
+watch -n2 './ipplan-pinger > /var/tmp/export/ipplan-pinger.prom-new; mv /var/tmp/export/ipplan-pinger.prom-new /var/tmp/export/ipplan-pinger.prom'
