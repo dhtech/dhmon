@@ -21,27 +21,28 @@ def _poll(data):
   Some contexts doesn't exist and will just time out, which takes
   a loong time. So we run them in parallel.
   """
-  target, vlan, oid = data
-  logging.debug('Collecting %s on %s @ %s', oid, target.host, vlan)
+  target, vlan, oids = data
   errors = 0
   timeouts = 0
-  if not oid.startswith('.1'):
-    logging.warning(
-        'OID %s does not start with .1, please verify configuration', oid)
-    return
   results = {}
-  try:
-    results.update(target.walk(oid, vlan))
-  except snmp.TimeoutError, e:
-    timeouts += 1
-    if vlan:
-      logging.debug(
-          'Timeout, is switch configured for VLAN SNMP context? %s', e)
-    else:
-      logging.debug('Timeout, slow switch? %s', e)
-  except snmp.Error, e:
-    errors += 1
-    logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
+  for oid in oids:
+    logging.debug('Collecting %s on %s @ %s', oid, target.host, vlan)
+    if not oid.startswith('.1'):
+      logging.warning(
+          'OID %s does not start with .1, please verify configuration', oid)
+      continue
+    try:
+      results.update(target.walk(oid, vlan))
+    except snmp.TimeoutError, e:
+      timeouts += 1
+      if vlan:
+        logging.debug(
+            'Timeout, is switch configured for VLAN SNMP context? %s', e)
+      else:
+        logging.debug('Timeout, slow switch? %s', e)
+    except snmp.Error, e:
+      errors += 1
+      logging.warning('SNMP error for OID %s@%s: %s', oid, vlan, str(e))
   return results, errors, timeouts
 
 
@@ -132,8 +133,7 @@ class Worker(stage.Stage):
     to_poll = []
     for vlan in list(vlans):
       oids = vlan_oids if vlan else global_oids
-      for oid in oids:
-        to_poll.append((target, vlan, oid))
+      to_poll.append((target, vlan, oids))
 
     results = {}
     for part_results, part_errors, part_timeouts in self.pool.imap(
