@@ -1,3 +1,6 @@
+TODO(bluecmd): Make this a daemon that exports with /metrics instead
+
+
 Please use python-pika from wheezy-backports or later
 
 Install:
