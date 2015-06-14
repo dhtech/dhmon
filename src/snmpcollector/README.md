@@ -70,3 +70,7 @@ SNMP configuration and reachability test:
     ./snmptest d01-a.event.dreamhack.local
 
 Configuration is read every minute and reloaded internally if it's different.
+
+# TODO
+
+ - Try PyPy and see how much difference it does
