@@ -105,9 +105,8 @@ class Exporter(stage.Stage):
       # Just ignore this for now.
       return
     labels[(
-      target.host, target.layer, result.index, result.interface,
-      result.vlan, result.data.type)] = (
-          result.data.value, target.timestamp)
+      target.host, target.layer, result.index, result.data.type)] = (
+          result.data.value, target.timestamp, result.labels)
 
   def run_dump(self):
     while True:
@@ -125,19 +124,19 @@ class Exporter(stage.Stage):
         continue
       out.write('# HELP {0} {1}::{0}\n'.format(obj, mib))
       out.write('# TYPE {0} {1}\n'.format(obj, metrics_type))
-      for (host, layer, index, interface, vlan, type), (value, timestamp) in (
+      for (host, layer, index, type), (value, timestamp, additional_labels) in (
           labels_map.iteritems()):
-        instance = ''.join([
-          obj,
-          '{',
-          'device="{0}",'.format(host),
-          'layer="{0}",'.format(layer),
-          'index="{0}",'.format(index),
-          'interface="{0}",'.format(interface),
-          'vlan="{0}",'.format(vlan),
-          'type="{0}"'.format(type),
-          '}'
-        ])
+
+        labels = dict(additional_labels)
+        labels['device'] = host
+        labels['layer'] = layer
+        labels['index'] = index
+        labels['type'] = type
+
+        label_list = ['{0}="{1}"'.format(k, v) for k, v in labels.iteritems()]
+        label_string = ','.join(label_list)
+        instance = ''.join([obj, '{', label_string, '}'])
+
         out.write('{0} {1} {2}\n'.format(
           instance, value, int(timestamp * 1000)))
 

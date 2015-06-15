@@ -3,7 +3,7 @@ import collections
 
 
 AnnotatedResultEntry = collections.namedtuple('AnnotatedResultEntry',
-    ('data', 'mib', 'obj', 'index', 'interface', 'vlan'))
+    ('data', 'mib', 'obj', 'index', 'labels'))
 
 Statistics = collections.namedtuple('Statistics', ('timeouts', 'errors'))
 

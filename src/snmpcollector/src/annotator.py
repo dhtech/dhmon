@@ -41,7 +41,9 @@ class Annotator(stage.Stage):
     for oid, result in results.iteritems():
       # Record some stats on how long time it took to get this metric
       elapsed = (time.time() - target.timestamp) * 1000 * 1000
+      labels = {}
       vlan = ''
+
       if '@' in oid:
         oid, vlan = oid.split('@')
 
@@ -64,8 +66,9 @@ class Annotator(stage.Stage):
           interface = interfaces_map.get(index, None)
           break
 
+      labels = {'interface': interface, 'vlan': vlan}
       annotated_results[oid] = actions.AnnotatedResultEntry(
-        result, mib, obj, index, interface, vlan)
+          result, mib, obj, index, labels)
 
     yield actions.AnnotatedResult(target, annotated_results, stats)
     logging.debug('Annotation completed for %d metrics for %s',
