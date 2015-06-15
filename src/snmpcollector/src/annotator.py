@@ -24,18 +24,23 @@ class Annotator(stage.Stage):
     self.mibresolver = mibresolver
 
   def do_result(self, target, results, stats):
-    if_oids = config.get('annotator', 'annotate-oids-with-iface')
-    iface_oid = config.get('annotator', 'iface-oid') + '.'
+    annotations = config.get('annotator', 'annotations')
 
-    # This is a hack to add human interfaces to metrics
-    # Do a pre-scan to see if we have an updated ifDescr table
-    # Basically add a label to the metric if we have an interface that matches
-    # the index.
-    interfaces_map = {}
+    # Calculate map to skip annotation if we're sure we're not going to annotate
+    # TODO(bluecmd): This could be cached
+    annotation_map = {}
+    for annotation in annotations:
+      for annotate in annotation['annotate']:
+        # Add '.' to not match .1.2.3 if we want to annotate 1.2.30
+        annotation_map[annotate + '.'] = annotation['with']
+
+    # Calculate annotator map
+    split_oid_map = collections.defaultdict(dict)
     for oid, result in results.iteritems():
-      # Check for ifDescr
-      if oid.startswith(iface_oid):
-        interfaces_map[oid[len(iface_oid):]] = result.value
+      # We only support the last part of an OID as index for annotations
+      key, index = oid.rsplit('.', 1)
+      key += '.'
+      split_oid_map[key][index] = result.value
 
     annotated_results = {}
     for oid, result in results.iteritems():
@@ -59,20 +64,36 @@ class Annotator(stage.Stage):
       mib, part = name.split('::', 1)
       obj, index = part.split('.', 1) if '.' in part else (part, None)
 
-      # Add linterfaces label if we suspect this to be an interface metric
-      interface = None
-      for if_oid in if_oids:
-        if oid.startswith(if_oid + '.') or oid == if_oid:
-          interface = interfaces_map.get(index, None)
-          break
+      labels = {'vlan': vlan}
+      labels.update(self.annotate(oid, annotation_map, split_oid_map, results))
 
-      labels = {'interface': interface, 'vlan': vlan}
       annotated_results[oid] = actions.AnnotatedResultEntry(
           result, mib, obj, index, labels)
 
     yield actions.AnnotatedResult(target, annotated_results, stats)
     logging.debug('Annotation completed for %d metrics for %s',
         len(annotated_results), target.host)
+
+  def annotate(self, oid, annotation_map, split_oid_map, results):
+    for key in annotation_map:
+      if oid.startswith(key):
+        break
+    else:
+      return {}
+
+    # We only support the last part of an OID as index for annotations
+    _, index = oid.rsplit('.', 1)
+    labels = {}
+    for label, annotation_oid in annotation_map[key].iteritems():
+      annotation_key = annotation_oid + '.'
+      part = split_oid_map.get(annotation_key, None)
+      if not part:
+        continue
+      value = part.get(index, None)
+      if not value:
+        continue
+      labels[label] = value
+    return labels
 
 
 if __name__ == '__main__':
