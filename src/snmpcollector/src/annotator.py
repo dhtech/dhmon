@@ -92,7 +92,7 @@ class Annotator(stage.Stage):
       value = part.get(index, None)
       if not value:
         continue
-      labels[label] = value
+      labels[label] = value.replace('"', '\\"')
     return labels
 
 
