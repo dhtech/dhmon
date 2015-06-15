@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env pypy
 import BaseHTTPServer
 import SocketServer
 import base64
@@ -44,7 +44,7 @@ class Exporter(stage.Stage):
   def __init__(self):
     super(Exporter, self).__init__()
     self.metrics = {}
-    self.metrics_copy = {}
+    self.prometheus_output = []
     self.copy_lock = threading.Lock()
     self.summaries = {}
     self.seen_targets = collections.defaultdict(set)
@@ -57,12 +57,17 @@ class Exporter(stage.Stage):
     with self.copy_lock:
       self._save(target, results)
 
+    OID_COUNT.labels(target.host).set(len(results))
+
     timestamp = target.timestamp
     latency = time.time() - timestamp
 
     ERROR_COUNT.labels(target.host).inc(stats.errors)
     TIMEOUT_COUNT.labels(target.host).inc(stats.timeouts)
     DEVICE_LATENCY.labels(target.host).observe(latency)
+
+    logging.debug('Export completed for %d metrics for %s',
+        len(results), target.host)
 
     # Try to see if we're done with this round
     self.seen_targets[timestamp].add(target)
@@ -82,10 +87,6 @@ class Exporter(stage.Stage):
     for oid, result in results.iteritems():
       self.export(target, result)
 
-    OID_COUNT.labels(target.host).set(len(results))
-    logging.debug('Export completed for %d metrics for %s',
-        len(results), target.host)
-
   def export(self, target, result):
     metric = self.metrics.get(result.obj, None)
     if result.data.type == 'COUNTER64' or result.data.type == 'COUNTER':
@@ -99,7 +100,7 @@ class Exporter(stage.Stage):
       metric = (result.mib, metric_type, {})
       self.metrics[result.obj] = metric
 
-    _, saved_metric_type, labels = self.metrics[result.obj]
+    _, saved_metric_type, labels = metric
     if metric_type != saved_metric_type:
       # This happens if we have a collision somewhere ('local' is common)
       # Just ignore this for now.
@@ -115,30 +116,36 @@ class Exporter(stage.Stage):
         metrics_copy = {}
         for obj, (mib, type, labels) in self.metrics.iteritems():
           metrics_copy[obj] = (mib, type, dict(labels))
-      self.metrics_copy = metrics_copy
+
+      # Assemble the output
+      out = []
+      for obj, (mib, metrics_type, labels_map) in metrics_copy.iteritems():
+        if metrics_type != 'counter' and metrics_type != 'gauge':
+          continue
+        out.append('# HELP {0} {1}::{0}\n'.format(obj, mib))
+        out.append('# TYPE {0} {1}\n'.format(obj, metrics_type))
+        for (host, layer, index, type), (value, timestamp, add_labels) in (
+            labels_map.iteritems()):
+
+          labels = dict(add_labels)
+          labels['device'] = host
+          labels['layer'] = layer
+          labels['index'] = index
+          labels['type'] = type
+
+          label_list = ['{0}="{1}"'.format(k, v) for k, v in labels.iteritems()]
+          label_string = ','.join(label_list)
+          instance = ''.join([obj, '{', label_string, '}'])
+
+          out.append('{0} {1} {2}\n'.format(
+            instance, value, int(timestamp * 1000)))
+
+      self.prometheus_output = out
       time.sleep(10)
 
   def write_metrics(self, out):
-    for obj, (mib, metrics_type, labels_map) in self.metrics_copy.iteritems():
-      if metrics_type != 'counter' and metrics_type != 'gauge':
-        continue
-      out.write('# HELP {0} {1}::{0}\n'.format(obj, mib))
-      out.write('# TYPE {0} {1}\n'.format(obj, metrics_type))
-      for (host, layer, index, type), (value, timestamp, additional_labels) in (
-          labels_map.iteritems()):
-
-        labels = dict(additional_labels)
-        labels['device'] = host
-        labels['layer'] = layer
-        labels['index'] = index
-        labels['type'] = type
-
-        label_list = ['{0}="{1}"'.format(k, v) for k, v in labels.iteritems()]
-        label_string = ','.join(label_list)
-        instance = ''.join([obj, '{', label_string, '}'])
-
-        out.write('{0} {1} {2}\n'.format(
-          instance, value, int(timestamp * 1000)))
+    for row in self.prometheus_output:
+      out.write(row)
 
 
 if __name__ == '__main__':

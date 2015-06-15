@@ -1,3 +1,5 @@
+TODO(bluecmd): Explain why exporter is pypy (no netsnmp for pypy)
+
 # How it works
 
 snmpcollector is a multi-staged SNMP collection pipeline.

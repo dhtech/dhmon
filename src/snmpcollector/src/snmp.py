@@ -1,7 +1,8 @@
 import collections
 import logging
-import netsnmp
 
+
+_NETSNMP_CACHE = None
 
 ResultTuple = collections.namedtuple('ResultTuple', ['value', 'type'])
 
@@ -42,23 +43,33 @@ class SnmpTarget(object):
     self.priv_proto=priv_proto
     self.priv=priv
     self.sec_level=sec_level
+    self.netsnmp = None
 
   def _snmp_session(self, vlan=None, timeout=1000000, retries=3):
+    # Since pickle will import this module we do not want to drag netsnmp into
+    # this on every load. Load it when we need it.
+    global _NETSNMP_CACHE
+    if _NETSNMP_CACHE is None:
+      import netsnmp
+      _NETSNMP_CACHE = netsnmp
+    else:
+      netsnmp = _NETSNMP_CACHE
+
     if self.version == 3:
       context = ('vlan-%s' % vlan) if vlan else ''
       return netsnmp.Session(Version=3, DestHost=self._full_host,
         SecName=self.user, SecLevel=self.sec_level, Context=context,
         AuthProto=self.auth_proto, AuthPass=self.auth,
         PrivProto=self.priv_proto, PrivPass=self.priv,
-        UseNumeric=1, Timeout=timeout, Retries=retries)
+        UseNumeric=1, Timeout=timeout, Retries=retries), netsnmp
     else:
       community = ('%s@%s' % (self.community, vlan)) if vlan else self.community
       return netsnmp.Session(Version=self.version, DestHost=self._full_host,
           Community=community, UseNumeric=1, Timeout=timeout,
-          Retries=retries)
+          Retries=retries), netsnmp
 
   def walk(self, oid, vlan=None):
-    sess = self._snmp_session(vlan)
+    sess, netsnmp = self._snmp_session(vlan)
     ret = {}
     nextoid = oid
     offset = 0
@@ -98,9 +109,9 @@ class SnmpTarget(object):
     return ret
 
   def get(self, oid):
+    sess, netsnmp = self._snmp_session(timeout=500000, retries=2)
     var = netsnmp.Varbind(oid)
     var_list = netsnmp.VarList(var)
-    sess = self._snmp_session(timeout=500000, retries=2)
     sess.get(var_list)
     if sess.ErrorStr != '':
       if sess.ErrorStr == 'Timeout':
