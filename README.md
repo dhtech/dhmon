@@ -3,6 +3,7 @@ dhmon
 
 Awesome monitoring system for Dreamhack
 
+See the Wiki https://github.com/dhtech/dhmon/wiki for latest scratch notes.
 
 Troubleshooting
 ====
