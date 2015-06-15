@@ -61,7 +61,8 @@ annotator:
         - .1.3.6.1.2.1.2.2.1            # ifTable
         - .1.3.6.1.2.1.31.1.1           # ifXEntry
       with:
-        interface: .1.3.6.1.2.1.2.2.1.2
+        interface: .1.3.6.1.2.1.2.2.1.2  # ifDescr
+        alias: .1.3.6.1.2.1.31.1.1.1.18  # ifAlias
 
     - annotate:
         - .1.3.6.1.4.1.9.9.91.1.1.1.1.4    # entSensorValue
@@ -98,6 +99,7 @@ collection:
       - .1.3.6.1.2.1.31.1.1.1.6     # ifHCInOctets
       - .1.3.6.1.2.1.31.1.1.1.10    # ifHCOutOctets
       - .1.3.6.1.2.1.31.1.1.1.15    # ifHighSpeed
+      - .1.3.6.1.2.1.31.1.1.1.18    # ifAlias
       - .1.3.6.1.2.1.47.1.1.1.1.9   # entPhysicalFirmwareRev
       - .1.3.6.1.4.1.9.2.1          # lcpu
       - .1.3.6.1.4.1.9.9.109.1.1.1.1  # cisco CPU
