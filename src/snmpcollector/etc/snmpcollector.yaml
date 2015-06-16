@@ -69,7 +69,12 @@ annotator:
       with:
         sensor: .1.3.6.1.2.1.47.1.1.1.1.2   # entPhysicalDesc
         type: .1.3.6.1.4.1.9.9.91.1.1.1.1.1 # entSensorType
-        type: .1.3.6.1.4.1.9.9.91.1.1.1.1.2 # entSensorScale
+        # TODO(bluecmd): This might be better to map to a proper
+        # scale so that we can do entSensorValue / entSensorScale
+        # TOOD(bluecmd): We want to do OID value resolution for
+        # these kind of oids. Right now we save e.g "7", while we
+        # should save "millis".
+        scale: .1.3.6.1.4.1.9.9.91.1.1.1.1.2 # entSensorScale
 
     - annotate:
         - .1.3.6.1.4.1.14179.2.1.1.1.38      # bsnDot11EssNumberOfMobileStation
