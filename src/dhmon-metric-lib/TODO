@@ -1,3 +1,0 @@
-
-Cleanup dhmon.py and dhmond to share code (dhmonlib?)
-Create a way to transform metrics to do stuff like adding ifAlias to dicts in redis for ifSpeed etc.

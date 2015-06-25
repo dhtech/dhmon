@@ -1,6 +1,0 @@
-number_of_daemons: 1
-name: snmpcollector
-pid: /var/run/dhmon/snmp.trigger.pid
-period: 60000
-scripts:
-  - /srv/dhmon/src/snmpcollector/src/trigger.py

@@ -1,6 +1,0 @@
-number_of_daemons: 1
-pid: /var/run/dhmon/rancid-heartbeat.pid
-name: rancid-heartbeat
-period: 60000
-scripts:
-  - /srv/dhmon/src/metrics/rancid-heartbeat
