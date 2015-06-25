@@ -4,3 +4,9 @@
 build/
 *.pyc
 node_modules
+debian/files
+debian/*.log
+debian/*.substvars
+debian/analytics/
+debian/pinger/
+debian/snmpcollector/

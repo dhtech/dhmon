@@ -1,0 +1,5 @@
+opt/pinger/src/* /usr/share/pinger/
+opt/pinger/ipplan-pinger /usr/bin/
+opt/pinger/pingerd /usr/bin/
+etc/pinger.yaml
+usr/local/lib/python2.7/dist-packages/dhmonpinger* usr/lib/python2.7/dist-packages/

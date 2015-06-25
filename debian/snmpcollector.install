@@ -1,0 +1,6 @@
+opt/snmpcollector/src/* /usr/share/snmpcollector/
+opt/snmpcollector/snmptest /usr/bin/
+etc/snmpcollector.yaml
+etc/default/snmpcollector
+usr/local/lib/python2.7/dist-packages/mibresolver* usr/lib/python2.7/dist-packages/
+usr/local/lib/pypy2.7/dist-packages/* usr/lib/pypy/dist-packages/

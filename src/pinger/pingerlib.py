@@ -9,10 +9,10 @@ import Queue
 
 
 def connect():
-  config = yaml.safe_load(file('/etc/dhmon.yaml'))
+  config = yaml.safe_load(file('/etc/pinger.yaml'))
   mq = config.get('mq', None)
   if not mq:
-    raise KeyError('No "mq" key in config file /etc/dhmon.yaml')
+    raise KeyError('No "mq" key in config file /etc/pinger.yaml')
   credentials = pika.PlainCredentials(mq['username'], mq['password'])
   connection = pika.BlockingConnection(
       pika.ConnectionParameters(mq['host'], credentials=credentials))

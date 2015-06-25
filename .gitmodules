@@ -1,0 +1,11 @@
+[submodule "deps/pyyaml"]
+	path = deps/pyyaml
+	url = https://github.com/yaml/pyyaml
+	branch = master
+[submodule "deps/pika"]
+	path = deps/pika
+	url = https://github.com/pika/pika
+[submodule "deps/client_python"]
+	path = deps/prometheus_client_python
+	url = https://github.com/prometheus/client_python.git
+	branch = master

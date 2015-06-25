@@ -1,0 +1,8 @@
+deps/pyyaml/tests/data/invalid-character.loader-error
+deps/pyyaml/tests/data/odd-utf16.stream-error
+deps/pyyaml/tests/data/spec-05-01-utf16be.data
+deps/pyyaml/tests/data/spec-05-01-utf16le.data
+deps/pyyaml/tests/data/spec-05-02-utf16be.data
+deps/pyyaml/tests/data/spec-05-02-utf16le.data
+deps/pyyaml/tests/data/utf16be.data
+deps/pyyaml/tests/data/utf16le.data

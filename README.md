@@ -1,37 +1,35 @@
 dhmon
 =====
 
-Awesome monitoring system for Dreamhack
+Awesome monitoring system for DreamHack
 
 See the Wiki https://github.com/dhtech/dhmon/wiki for latest scratch notes.
 
-Troubleshooting
-====
+## Products
 
-1. Messaging
-Check that the queues are running:
-https://X/rabbitmq/#/queues
+dhmon consists of a number of smaller products:
 
-1. NTP
-When debugging dhmon, always make sure that time is set correctly.
-Weird stuff will happen (data will not appear, inserts will be ignored etc.)
-if you do not have the correct time set up.
+ - **snmpcollector** The SNMP collection daemons
+ - **pinger** RTT statistics collector
+ - **analytics** API backend to access processed statistics
 
-1. Crashes
-Blabalbal. Talk about crashes in launcher, dhmon et al.
-status should work on a lot of daemons, but not launcher
+## Installation
 
-To check status:
-ls /etc/init.d/dhmon-* | xargs -I{} bash {} status
+Install the Debian packages for the products you want.
 
-1. InfluxDB errors
-Check for errors in /opt/influxdb/shared/log.txt.
-Also a high number of QPS to InfluxDB might overload it.
+## Building Debian packages
 
-1. Network rules
-Make sure that the daemons can talk both v4 and v6.
-Almost all daemons and clients need to talk to RabbitMQ.
+You need to have `setuptools` for pypy installed
+    wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo pypy
 
-1. Syslog
-Syslog logs *a lot* of data. Check it and see if you can spot any errors.
-Errors should be logged with the ERROR class, so it should be grepable.
+Build the packages
+    # Create a new snapshot version
+    gbp dch --snapshot --auto
+    
+    # Clean
+    rm ../dhmon_*.orig.tar.gz
+    
+    # Build
+    gbp buildpackage --git-upstream-tree=master --git-submodules \
+        --git-ignore-new --git-builder='debuild -i -I -k28B92277'
+
