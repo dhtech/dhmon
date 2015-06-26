@@ -12,5 +12,4 @@ SNMP_WORKERS=50
 SNMP_ANNOTATORS=10
 
 # snmpcollector only supports one exporter currently
-SNMP_EXPORTER=1
-
+SNMP_EXPORTERS=1

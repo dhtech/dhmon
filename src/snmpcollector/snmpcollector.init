@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### BEGIN INIT INFO
-# Provides:        dhmon-snmpcollector
+# Provides:        snmpcollector
 # Required-Start:  $network $remote_fs $syslog
 # Required-Stop:   $network $remote_fs $syslog
 # Default-Start:   2 3 4 5
@@ -13,12 +13,12 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
 . /lib/lsb/init-functions
 
-DHMON=/srv/dhmon
-DHMONRUN=/var/run/dhmon
-test -d $DHMON || exit 5
+BASE=/usr/share/snmpcollector
+RUN=/var/run/snmpcollector
+test -d $BASE || exit 5
 
-if [ -r /etc/default/dhmon ]; then
-  . /etc/default/dhmon
+if [ -r /etc/default/snmpcollector ]; then
+  . /etc/default/snmpcollector
 fi
 
 
@@ -45,11 +45,11 @@ stage() {
   all_status=0
   for i in $(seq 1 $instances)
   do
-    PIDFILE=$DHMONRUN/snmp.$name.$i.pid
+    PIDFILE=${RUN}/snmpcollector.$name.$i.pid
     if [[ "$action" == "start" ]]; then
       echo -n " $i"
       start-stop-daemon -b --start --oknodo --pidfile $PIDFILE \
-        --startas $DHMON/src/snmpcollector/src/$script -- --pid $PIDFILE
+        --startas $BASE/$script -- --pid $PIDFILE
       ret=$?
     elif [[ "$action" == "stop" ]]; then
       echo -n " $i"
@@ -73,7 +73,7 @@ stage() {
 
 case $1 in
   start)
-    mkdir -p $DHMONRUN
+    mkdir -p ${RUN}
     stage 'start' 'supervisor' 'supervisor.py' "${SNMP_SUPERVISORS}"
     stage 'start' 'worker'     'worker.py'     "${SNMP_WORKERS}"
     stage 'start' 'annotator'  'annotator.py'  "${SNMP_ANNOTATORS}"
