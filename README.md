@@ -20,9 +20,11 @@ Install the Debian packages for the products you want.
 ## Building Debian packages
 
 You need to have `setuptools` for pypy installed
+
     wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo pypy
 
 Build the packages
+
     # Create a new snapshot version
     gbp dch --snapshot --auto
     
