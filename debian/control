@@ -5,23 +5,29 @@ Priority: optional
 Standards-Version: 3.9.2
 Build-Depends: debhelper (>= 9), pypy
 
-Package: snmpcollector
+Package: dhmon-common
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Common dependencies for dhmon
+ Dependencies that all or almost all dhmon components share.
+
+Package: snmpcollector
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, dhmon-common,
  python-netsnmp, python-pika (>=0.9.14), pypy
 Description: SNMP collector for dhmon
  SNMP collection for the DreamHack monitoring system.
 
 Package: pinger
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, dhmon-common,
  python-pika (>=0.9.14), python-daemon
 Description: RTT collector for dhmon
  RTT collection for the DreamHack monitoring system.
 
 #Package: analytics
 #Architecture: all
-#Depends: ${shlibs:Depends}, ${misc:Depends}
+#Depends: ${shlibs:Depends}, ${misc:Depends}, dhmon-common
 #Description: Analytics API server for dhmon
 # API backend for for the DreamHack monitoring system.
 

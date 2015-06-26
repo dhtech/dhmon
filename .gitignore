@@ -10,3 +10,4 @@ debian/*.substvars
 debian/analytics/
 debian/pinger/
 debian/snmpcollector/
+debian/dhmon-common/
