@@ -45,6 +45,17 @@ class SnmpTarget(object):
     self.sec_level=sec_level
     self.netsnmp = None
 
+  def __eq__(self, other):
+    if not isinstance(other, self.__class__):
+      return False
+    return (
+        self.host == other.host and self.ip == other.ip and
+        self.timestamp == other.timestamp and self.layer == other.layer and
+        self.version == other.version and self.community == other.community and
+        self.user == other.user and self.auth_proto == other.auth_proto and
+        self.auth == other.auth and self.priv_proto == other.priv_proto and
+        self.priv == other.priv and self.sec_level == other.sec_level)
+
   def _snmp_session(self, vlan=None, timeout=1000000, retries=3):
     # Since pickle will import this module we do not want to drag netsnmp into
     # this on every load. Load it when we need it.

@@ -8,38 +8,43 @@ CONFIG_FILENAME = '/etc/snmpcollector.yaml'
 # How long to keep the configuration structure in memory before refreshing it
 CONFIG_CACHE = 60
 
-# Which config refresh (that resulted in config change) incarnation
-incarnation = 0
 
+class Config(object):
 
-_config = None
-_timestamp = 0
+  def __init__(self):
+    self.incarnation = 0
+    self._config = None
+    self.timestamp = 0
 
-
-def refresh():
-  global incarnation
-  global _config
-  global _timestamp
-
-  new_config = None
-  try:
+  def load(filename=CONFIG_FILENAME):
     with file(CONFIG_FILENAME, 'r') as f:
       new_config = yaml.load(f)
-    if new_config == _config:
-      return
-  except Exception:
-    logging.exception('Exception while reading new config, ignoring')
-    return
+    return new_config
 
-  incarnation += 1
-  _config = new_config
-  _timestamp = time.time()
+  @property
+  def config(self):
+    if self.timestamp + CONFIG_CACHE > time.time():
+      return self._config
+    new_config = None
+    try:
+      new_config = self.load()
+      if new_config == self._config:
+        return self._config
+    except Exception:
+      logging.exception('Exception while reading new config, ignoring')
+      return self._config
+
+    self.incarnation += 1
+    self.timestamp = time.time()
+    self._config = new_config
+    return new_config
+
+
+_config_object = Config()
+
 
 def get(*path):
-  if _timestamp + CONFIG_CACHE < time.time():
-    refresh()
-
-  ret = _config
+  ret = _config_object.config
   for element in path:
     ret = ret.get(element, None)
     if not ret:

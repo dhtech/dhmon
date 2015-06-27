@@ -31,6 +31,9 @@ class Trigger(Action):
   def do(self, stage, run):
     return stage.do_trigger(run)
 
+  def __eq__(self, other):
+    return isinstance(other, self.__class__)
+
 
 class SnmpWalk(Action):
   """Walk over a given device."""
@@ -40,6 +43,11 @@ class SnmpWalk(Action):
 
   def do(self, stage, run):
     return stage.do_snmp_walk(run, self.target)
+
+  def __eq__(self, other):
+    if not isinstance(other, self.__class__):
+      return False
+    return self.target == other.target
 
 
 class Summary(Action):
@@ -60,6 +68,11 @@ class Summary(Action):
   def do(self, stage, run):
     return stage.do_summary(run, self.timestamp, self.targets)
 
+  def __eq__(self, other):
+    if not isinstance(other, self.__class__):
+      return False
+    return self.targets == other.targets and self.timestamp == other.timestamp
+
 
 class Result(Action):
   """One target's Exporter set."""
@@ -71,6 +84,13 @@ class Result(Action):
 
   def do(self, stage, run):
     return stage.do_result(run, self.target, self.results, self.stats)
+
+  def __eq__(self, other):
+    if not isinstance(other, self.__class__):
+      return False
+    return (
+        self.target == other.target and self.results == other.results and
+        self.stats == other.stats)
 
 
 class AnnotatedResult(Result):

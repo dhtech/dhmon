@@ -17,13 +17,17 @@ class Supervisor(object):
   message to the workers.
   """
 
-  def construct_targets(self, timestamp):
+  def fetch_nodes(self):
     db = sqlite3.connect(config.get('ipplan'))
     cursor = db.cursor()
     sql = ("SELECT h.name, h.ipv4_addr_txt, o.value FROM host h, option o "
         "WHERE o.name = 'layer' AND h.node_id = o.node_id")
+    # TODO(bluecmd): We should probably use an iterator here instead
+    return cursor.execute(sql).fetchall()
+
+  def construct_targets(self, timestamp):
     nodes = {}
-    for host, ip, layer in cursor.execute(sql).fetchall():
+    for host, ip, layer in self.fetch_nodes():
       layer_config = config.get('snmp', layer)
       if layer_config is None:
         logging.error('Unable to target "%s" since layer "%s" is unknown',
