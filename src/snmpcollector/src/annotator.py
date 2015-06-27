@@ -9,7 +9,7 @@ import config
 import stage
 
 
-class Annotator(stage.Stage):
+class Annotator(object):
   """Annotation step where results are given meaningful labels."""
 
   def __init__(self):
@@ -23,7 +23,7 @@ class Annotator(stage.Stage):
     import mibresolver
     self.mibresolver = mibresolver
 
-  def do_result(self, target, results, stats):
+  def do_result(self, run, target, results, stats):
     annotations = config.get('annotator', 'annotations')
 
     # Calculate map to skip annotation if we're sure we're not going to annotate
@@ -97,6 +97,6 @@ class Annotator(stage.Stage):
 
 
 if __name__ == '__main__':
-  stage = Annotator()
-  stage.listen(actions.Result)
-  stage.run()
+  annotator = stage.Stage(Annotator())
+  annotator.listen(actions.Result)
+  annotator.run()

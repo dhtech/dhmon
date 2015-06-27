@@ -3,7 +3,7 @@ import collections
 
 
 RunInformation = collections.namedtuple('RunInformation',
-        ('tag', 'debug'))
+        ('tag', 'debug', 'trace'))
 
 AnnotatedResultEntry = collections.namedtuple('AnnotatedResultEntry',
     ('data', 'mib', 'obj', 'index', 'labels'))
@@ -20,7 +20,7 @@ class Action(object):
     return 'dhmon:snmp:{0}:{1}'.format(instance, cls.__name__)
 
   @abc.abstractmethod
-  def do(self, stage):
+  def do(self, stage, run):
     """Execute an action, return a list of result actions."""
     pass
 
@@ -28,8 +28,8 @@ class Action(object):
 class Trigger(Action):
   """Trigger the supervisor to start a new poll."""
 
-  def do(self, stage):
-    return stage.do_trigger()
+  def do(self, stage, run):
+    return stage.do_trigger(run)
 
 
 class SnmpWalk(Action):
@@ -38,8 +38,8 @@ class SnmpWalk(Action):
   def __init__(self, target):
     self.target = target
 
-  def do(self, stage):
-    return stage.do_snmp_walk(self.target)
+  def do(self, stage, run):
+    return stage.do_snmp_walk(run, self.target)
 
 
 class Summary(Action):
@@ -57,8 +57,8 @@ class Summary(Action):
     self.timestamp = timestamp
     self.targets = targets
 
-  def do(self, stage):
-    return stage.do_summary(self.timestamp, self.targets)
+  def do(self, stage, run):
+    return stage.do_summary(run, self.timestamp, self.targets)
 
 
 class Result(Action):
@@ -69,8 +69,8 @@ class Result(Action):
     self.results = results
     self.stats = stats
 
-  def do(self, stage):
-    return stage.do_result(self.target, self.results, self.stats)
+  def do(self, stage, run):
+    return stage.do_result(run, self.target, self.results, self.stats)
 
 
 class AnnotatedResult(Result):

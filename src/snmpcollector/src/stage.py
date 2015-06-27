@@ -12,17 +12,20 @@ import config
 
 
 class Stage(object):
-  """Base class for SNMP collector workers.
+  """Class for SNMP collector pipeline stages.
 
-  By implementing this class you will get access to the
-  appropriate RabbitMQ queues and event processing.
-
-  When an Action instance is pushed, it will be executed with the
-  stage (class instance) as a parameter.
+  This is the shared code between all pipeline stages.
+  The flow is:
+    * Listen on incoming queues
+    * When a new Action arrives, execute it
+     * Action will be called with the 'logic' as parameter
+     * Action calls the logic
+    * Result from the Action is pushed on the outgoing queue for that Action
   """
 
-  def __init__(self):
-    self.name = self.__class__.__name__
+  def __init__(self, logic):
+    self.name = logic.__class__.__name__
+    self.logic = logic
     self.listen_to = set()
     self.to_purge = set()
     self.task_channel = None
@@ -95,14 +98,20 @@ class Stage(object):
       channel.basic_ack(delivery_tag=method.delivery_tag)
 
   def _task_callback(self, channel, method, properties, body):
+    start = time.time()
     action, run = pickle.loads(body)
     if not isinstance(action, actions.Action):
       logging.error('Got non-action in task queue: %s', repr(body))
       return
 
-    generator = action.do(self, run)
+    generator = action.do(self.logic, run)
     if not generator:
       return
+
+    # Mark the time we spent in this pipeline
+    end = time.time()
+    run.trace[self.name] = (start, end)
+
     for action in generator:
       self.push(action, run)
 

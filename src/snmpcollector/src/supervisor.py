@@ -9,7 +9,7 @@ import snmp
 import stage
 
 
-class Supervisor(stage.Stage):
+class Supervisor(object):
   """Single instance target enumerator.
 
   When triggered the supervisor will scan ipplan.db to find all
@@ -31,7 +31,7 @@ class Supervisor(stage.Stage):
         continue
       yield host, snmp.SnmpTarget(host, ip, timestamp, layer, **layer_config)
 
-  def do_trigger(self):
+  def do_trigger(self, run):
     timestamp = time.time()
 
     targets = 0
@@ -47,7 +47,7 @@ class Supervisor(stage.Stage):
 
 
 if __name__ == '__main__':
-  stage = Supervisor()
+  stage = stage.Stage(Supervisor())
   stage.purge(actions.Trigger)
   stage.listen(actions.Trigger)
   stage.run()

@@ -37,7 +37,7 @@ OID_COUNT = prometheus_client.Gauge(
     'snmp_oid_count', 'Number of OIDs exported', ('device',))
 
 
-class Exporter(stage.Stage):
+class Exporter(object):
 
   NUMERIC_TYPES = ['COUNTER', 'COUNTER64', 'INTEGER', 'TICKS', 'GAUGE']
 
@@ -49,11 +49,11 @@ class Exporter(stage.Stage):
     self.summaries = {}
     self.seen_targets = collections.defaultdict(set)
 
-  def do_summary(self, timestamp, targets):
+  def do_summary(self, run, timestamp, targets):
     self.summaries[timestamp] = targets
     SUMMARIES_COUNT.set(len(self.summaries))
 
-  def do_result(self, target, results, stats):
+  def do_result(self, run, target, results, stats):
     with self.copy_lock:
       self._save(target, results)
 
@@ -149,7 +149,7 @@ class Exporter(stage.Stage):
 
 
 if __name__ == '__main__':
-  stage = Exporter()
+  exporter = stage.Stage(Exporter())
   # TODO(bluecmd): This seems to be a bit unstable. I never got this to
   # work in daemon mode, which is odd. I need to debug this more.
   # For now, run the exporter like 'python src/exporter.py -d'
@@ -178,12 +178,12 @@ if __name__ == '__main__':
   t.daemon = True
   t.start()
 
-  t = threading.Thread(target=stage.run_dump)
+  t = threading.Thread(target=exporter.logic.run_dump)
   t.daemon = True
   t.start()
 
   prometheus_client.start_http_server(HTTP_MAIN_PORT)
 
-  stage.listen(actions.AnnotatedResult)
-  stage.listen(actions.Summary)
-  stage.run()
+  exporter.listen(actions.AnnotatedResult)
+  exporter.listen(actions.Summary)
+  exporter.run()
