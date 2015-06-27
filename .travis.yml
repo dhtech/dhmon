@@ -19,4 +19,4 @@ script:
   - make deb
 
 after_success:
-  - (cd src/snmpcollector; coveralls)
+  - coveralls
