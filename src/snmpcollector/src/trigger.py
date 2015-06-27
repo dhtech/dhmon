@@ -10,4 +10,6 @@ class Trigger(stage.Stage):
 if __name__ == '__main__':
   stage = Trigger()
   stage.startup()
-  stage.push(actions.Trigger(), expire=5000)
+  # TODO(bliecmd): Mark latency and add tag
+  debug = {}
+  stage.push(actions.Trigger(), actions.RunInformation('', debug), expire=5000)

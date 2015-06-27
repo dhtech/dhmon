@@ -74,12 +74,12 @@ class Stage(object):
     # This closes channels as well
     self.connection.close()
 
-  def push(self, action, expire=None):
+  def push(self, action, run, expire=None):
     properties = pika.BasicProperties(
         expiration=str(expire) if expire else None)
     self.result_channel.basic_publish(
         exchange='', routing_key=action.get_queue(self.args.instance),
-        body=pickle.dumps(action, protocol=pickle.HIGHEST_PROTOCOL),
+        body=pickle.dumps((action, run), protocol=pickle.HIGHEST_PROTOCOL),
         properties=properties)
 
   def listen(self, action_cls):
@@ -95,16 +95,16 @@ class Stage(object):
       channel.basic_ack(delivery_tag=method.delivery_tag)
 
   def _task_callback(self, channel, method, properties, body):
-    action = pickle.loads(body)
+    action, run = pickle.loads(body)
     if not isinstance(action, actions.Action):
       logging.error('Got non-action in task queue: %s', repr(body))
       return
 
-    generator = action.do(self)
+    generator = action.do(self, run)
     if not generator:
       return
     for action in generator:
-      self.push(action)
+      self.push(action, run)
 
   def purge(self, action_cls):
     self.to_purge.add(action_cls)

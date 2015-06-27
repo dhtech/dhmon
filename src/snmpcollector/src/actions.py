@@ -2,6 +2,9 @@ import abc
 import collections
 
 
+RunInformation = collections.namedtuple('RunInformation',
+        ('tag', 'debug'))
+
 AnnotatedResultEntry = collections.namedtuple('AnnotatedResultEntry',
     ('data', 'mib', 'obj', 'index', 'labels'))
 
