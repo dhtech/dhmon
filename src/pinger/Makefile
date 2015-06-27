@@ -4,6 +4,9 @@ clean:
 all:
 	true
 
+test:
+	true
+
 install:
 	python setup.py install --root $(DESTDIR) $(COMPILE)
 	mkdir -p $(DESTDIR)/opt/pinger/src/

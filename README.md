@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/dhtech/dhmon.svg)](https://travis-ci.org/dhtech/dhmon)
+[![Coverage Status](https://coveralls.io/repos/dhtech/dhmon/badge.svg)](https://coveralls.io/r/dhtech/dhmon)
+
 dhmon
 =====
 
@@ -24,6 +27,10 @@ You need to have `setuptools` for pypy installed
     wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo pypy
 
 Build the packages
+
+    make deb
+
+or if you prefer the longer way:
 
     # Create a new snapshot version
     gbp dch --snapshot --auto

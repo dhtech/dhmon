@@ -3,7 +3,8 @@ Maintainer: Christian Svensson <blue@cmd.nu>
 Section: misc
 Priority: optional
 Standards-Version: 3.9.2
-Build-Depends: debhelper (>= 9), pypy
+Build-Depends: debhelper (>= 9), pypy, libsnmp-dev, python-dev,
+ python-pika, python-yaml
 
 Package: dhmon-common
 Architecture: any

@@ -11,3 +11,6 @@ debian/analytics/
 debian/pinger/
 debian/snmpcollector/
 debian/dhmon-common/
+debian/*.debhelper
+debian/tmp
+.coverage

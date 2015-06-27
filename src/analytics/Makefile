@@ -4,5 +4,8 @@ clean:
 all:
 	echo "TODO"
 
+test:
+	true
+
 install:
 	echo "TODO"

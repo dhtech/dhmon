@@ -1,0 +1,9 @@
+[run]
+cover_pylib = False
+branch  = False
+data_file = .coverage
+parallel = True
+source =
+  src/snmpcollector/src
+  src/pinger
+  src/analytics

@@ -1,8 +1,15 @@
 clean:
 	rm -fr build/
+	rm -f .coverage
+	rm -f src/*.pyc
 
 all:
 	echo "TODO"
+
+test:
+	(cd $(TESTBASE); \
+	coverage run -p $(CURDIR)/src/supervisor_test.py \
+	)
 
 install:
 	python setup.py install --root $(DESTDIR) $(COMPILE)
