@@ -1,9 +1,8 @@
-import actions
-import config
 import mock
-import stage
 import unittest
 import yaml
+
+import config
 
 
 class TestConfig(unittest.TestCase):

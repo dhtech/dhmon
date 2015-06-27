@@ -1,8 +1,9 @@
-import actions
 import mock
+import unittest
+
+import actions
 import stage
 import trigger
-import unittest
 
 
 class TestTrigger(unittest.TestCase):
