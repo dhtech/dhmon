@@ -3,7 +3,6 @@ language: python
 python:
   - "2.7"
 
-
 before_install:
   - echo "deb http://archive.ubuntu.com/ubuntu trusty main universe" | sudo tee -a /etc/apt/sources.list
   - sudo apt-get update -qq
@@ -20,3 +19,11 @@ script:
 
 after_success:
   - coveralls
+
+deploy:
+  provider: releases
+  api_key:
+    secure: eISBbJNB5f9PrKz4fwrnNrvunJHX2cZh2XXnORJ6bO7AAecaMOKJk1IAZd4TDb0UCqwFbp96P5JmC8Q8H/k/dD7QRV2IfXbbZ4E82OS7A3fVJ9x+0nq9KjsXWvxli38+PgUtHsAo9JAxEY5yvMLAp9DcX2YqxcK7kzG1FvD50SA=
+  file: "../*.deb"
+  on:
+    repo: dhtech/dhmon
