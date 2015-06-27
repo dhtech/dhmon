@@ -24,6 +24,7 @@ deploy:
   provider: releases
   api_key:
     secure: eISBbJNB5f9PrKz4fwrnNrvunJHX2cZh2XXnORJ6bO7AAecaMOKJk1IAZd4TDb0UCqwFbp96P5JmC8Q8H/k/dD7QRV2IfXbbZ4E82OS7A3fVJ9x+0nq9KjsXWvxli38+PgUtHsAo9JAxEY5yvMLAp9DcX2YqxcK7kzG1FvD50SA=
+  file_glob: true
   file: "../*.deb"
   on:
     repo: dhtech/dhmon
