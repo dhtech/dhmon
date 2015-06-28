@@ -33,8 +33,9 @@ class TestSuportvisor(unittest.TestCase):
     logic = supervisor.Supervisor()
     mock_config.return_value = yaml.load(CONFIG)
     mock_fetch_nodes.return_value = [
-        ('test1', '1.2.3.4', 'access'),
-        ('test2', '1.2.3.5', 'access')]
+        ('test1', '1.2.3.4', 'access', 'EVENT@TESTNET1'),
+        ('testb', '1.2.3.4', 'access', 'OTHER@TESTNET1'),
+        ('test2', '1.2.3.5', 'access', 'EVENT@TESTNET2')]
     expected_debug = {}
     debug = {}
 

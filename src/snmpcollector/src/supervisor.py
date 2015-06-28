@@ -20,14 +20,19 @@ class Supervisor(object):
   def fetch_nodes(self):
     db = sqlite3.connect(config.get('ipplan'))
     cursor = db.cursor()
-    sql = ("SELECT h.name, h.ipv4_addr_txt, o.value FROM host h, option o "
-        "WHERE o.name = 'layer' AND h.node_id = o.node_id")
+    sql = ('SELECT h.name, h.ipv4_addr_txt, o.value, n.name '
+        'FROM host h, option o, network n '
+        'WHERE o.name = "layer" AND h.node_id = o.node_id '
+        'AND h.network_id = n.node_id')
     # TODO(bluecmd): We should probably use an iterator here instead
     return cursor.execute(sql).fetchall()
 
   def construct_targets(self, timestamp):
     nodes = {}
-    for host, ip, layer in self.fetch_nodes():
+    domain = config.get('domain').lower()
+    for host, ip, layer, network in self.fetch_nodes():
+      if network.split('@', 1)[0].lower() != domain:
+        continue
       layer_config = config.get('snmp', layer)
       if layer_config is None:
         logging.error('Unable to target "%s" since layer "%s" is unknown',
