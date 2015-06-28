@@ -56,6 +56,7 @@ class Worker(object):
 
   def gather_oids(self, target, model):
     if config.incarnation != self.model_oid_cache_incarnation:
+      self.model_oid_cache_incarnation = config.incarnation
       self.model_oid_cache = {}
 
     cache_key = (target.layer, model)

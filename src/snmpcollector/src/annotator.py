@@ -15,13 +15,15 @@ class Annotator(object):
   def __init__(self):
     super(Annotator, self).__init__()
     self.mibcache = {}
-    self.mibresolver = None
+    self._mibresolver = None
 
-  def startup(self):
-    super(Annotator, self).startup()
+  @property
+  def mibresolver(self):
     # Do the import here to not spam the terminal with netsnmp stuff
-    import mibresolver
-    self.mibresolver = mibresolver
+    if self._mibresolver is None:
+      import mibresolver
+      self._mibresolver = mibresolver
+    return self._mibresolver
 
   def do_result(self, run, target, results, stats):
     annotations = config.get('annotator', 'annotations')
@@ -59,6 +61,10 @@ class Annotator(object):
 
       if name is None:
         logging.warning('Failed to look up OID %s, ignoring', oid)
+        continue
+
+      if not '::' in name:
+        logging.warning('OID %s resolved to %s (no MIB), ignoring', oid, name)
         continue
 
       mib, part = name.split('::', 1)

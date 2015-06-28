@@ -51,3 +51,7 @@ def get(*path):
       return None
 
   return ret
+
+@property
+def incarnation():
+  return _config_object.incarnation
