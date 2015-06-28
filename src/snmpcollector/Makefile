@@ -2,6 +2,7 @@ clean:
 	rm -fr build/
 	rm -f .coverage
 	rm -f src/*.pyc
+	rm -fr src/__pycache__/
 
 all:
 	echo "TODO"
