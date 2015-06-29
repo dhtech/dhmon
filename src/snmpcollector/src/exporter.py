@@ -160,7 +160,7 @@ if __name__ == '__main__':
       self.send_header(
         'Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
       self.end_headers()
-      stage.write_metrics(self.wfile)
+      exporter.logic.write_metrics(self.wfile)
 
     def log_message(self, format, *args):
       return
