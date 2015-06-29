@@ -1,5 +1,5 @@
 opt/snmpcollector/src/* /usr/share/snmpcollector/
-opt/snmpcollector/snmptest /usr/bin/dhmon-snmptest
+opt/snmpcollector/snmpcollector-test /usr/bin/
 etc/snmpcollector.yaml
 etc/default/snmpcollector
 etc/init.d/snmpcollector

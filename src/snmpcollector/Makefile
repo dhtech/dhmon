@@ -15,7 +15,7 @@ install:
 	python setup.py install --root $(DESTDIR) $(COMPILE)
 	mkdir -p $(DESTDIR)/opt/snmpcollector/src/
 	cp src/*.py $(DESTDIR)/opt/snmpcollector/src/
-	cp snmptest $(DESTDIR)/opt/snmpcollector/
+	cp snmpcollector-test $(DESTDIR)/opt/snmpcollector/
 	install -D -m600 etc/snmpcollector.yaml $(DESTDIR)/etc/
 	install -D etc/snmpcollector.default $(DESTDIR)/etc/default/snmpcollector
 	install -D snmpcollector.init $(DESTDIR)/etc/init.d/snmpcollector
