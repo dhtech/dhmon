@@ -1,5 +1,7 @@
 import collections
 import logging
+import os
+import sys
 
 
 _NETSNMP_CACHE = None
@@ -66,18 +68,31 @@ class SnmpTarget(object):
     else:
       netsnmp = _NETSNMP_CACHE
 
+    # Loading MIBs can be very noisy, so we close stderr
+    # Ideally we would just call netsnmp_register_loghandler but that isn't
+    # exported :-(
+    stderr = os.dup(sys.stderr.fileno())
+    null = os.open(os.devnull, os.O_RDWR)
+    os.close(sys.stderr.fileno())
+    os.dup2(null, sys.stderr.fileno())
+    os.close(null)
+
     if self.version == 3:
       context = ('vlan-%s' % vlan) if vlan else ''
-      return netsnmp.Session(Version=3, DestHost=self._full_host,
+      session = netsnmp.Session(Version=3, DestHost=self._full_host,
         SecName=self.user, SecLevel=self.sec_level, Context=context,
         AuthProto=self.auth_proto, AuthPass=self.auth,
         PrivProto=self.priv_proto, PrivPass=self.priv,
         UseNumeric=1, Timeout=timeout, Retries=retries), netsnmp
     else:
       community = ('%s@%s' % (self.community, vlan)) if vlan else self.community
-      return netsnmp.Session(Version=self.version, DestHost=self._full_host,
+      session = netsnmp.Session(Version=self.version, DestHost=self._full_host,
           Community=community, UseNumeric=1, Timeout=timeout,
           Retries=retries), netsnmp
+
+    # Restore stderr
+    os.dup2(stderr, sys.stderr.fileno())
+    return session
 
   def walk(self, oid, vlan=None):
     sess, netsnmp = self._snmp_session(vlan)

@@ -40,5 +40,7 @@ static PyMethodDef module_funcs[] = {
 
 void initmibresolver(void) {
   Py_InitModule3("mibresolver", module_funcs, "MIB resolver utilities");
+  /* Turn off noisy MIB debug logging */
+  netsnmp_register_loghandler(NETSNMP_LOGHANDLER_NONE, 0);
   init_snmp("snmpapp");
 }
