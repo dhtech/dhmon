@@ -36,6 +36,9 @@ TIMEOUT_COUNT = prometheus_client.Counter(
 OID_COUNT = prometheus_client.Gauge(
     'snmp_oid_count', 'Number of OIDs exported', ('device',))
 
+COMPLETED_POLL_COUNT = prometheus_client.Counter(
+    'snmp_completed_poll_count', 'Number of completed polls', ('device',))
+
 
 class Exporter(object):
 
@@ -62,6 +65,7 @@ class Exporter(object):
     timestamp = target.timestamp
     latency = time.time() - timestamp
 
+    COMPLETED_POLL_COUNT.labels(target.host).inc(1)
     ERROR_COUNT.labels(target.host).inc(stats.errors)
     TIMEOUT_COUNT.labels(target.host).inc(stats.timeouts)
     DEVICE_LATENCY.labels(target.host).observe(latency)
