@@ -19,7 +19,7 @@ class TestTrigger(unittest.TestCase):
   def testTriggerNoTag(self, mock_stage_class):
     mock_stage = mock_stage_class.return_value
     expected_run = actions.RunInformation(
-            '', debug={}, trace={'Trigger': (1234, 1234)})
+            '', trace={'Trigger': (1234, 1234)})
 
     self.logic.trigger('')
     mock_stage.push.assert_called_with(mock.ANY, expected_run, expire=5000)
@@ -28,7 +28,7 @@ class TestTrigger(unittest.TestCase):
   def testTriggerTag(self, mock_stage_class):
     mock_stage = mock_stage_class.return_value
     expected_run = actions.RunInformation(
-            'my_tag', debug={}, trace={'Trigger': (1234, 1234)})
+            'my_tag', trace={'Trigger': (1234, 1234)})
 
     self.logic.trigger('my_tag')
     mock_stage.push.assert_called_with(mock.ANY, expected_run, expire=5000)

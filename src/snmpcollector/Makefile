@@ -9,8 +9,7 @@ all:
 
 test:
 	(cd $(TESTBASE); \
-	coverage run -p $(CURDIR)/src/supervisor_test.py \
-	)
+	echo $(wildcard $(CURDIR)/src/*_test.py) | xargs -n 1 coverage run -p)
 
 install:
 	python setup.py install --root $(DESTDIR) $(COMPILE)

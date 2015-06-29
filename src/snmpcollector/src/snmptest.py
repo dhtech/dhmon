@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+import actions
 import argparse
 import logging
 import sqlite3
@@ -51,7 +52,7 @@ if args.oid:
   for i in target.walk(args.oid).iteritems():
     print >>sys.stderr, i
 else:
-  for action in worker_stage.do_snmp_walk(target):
+  for action in worker_stage.do_snmp_walk(actions.RunInformation(), target):
     for key in sorted(action.results.keys()):
       print >>sys.stderr, key, action.results[key]
     logging.info('Run stats: %s', action.stats)

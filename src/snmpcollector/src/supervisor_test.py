@@ -37,7 +37,6 @@ class TestSuportvisor(unittest.TestCase):
         ('testb', '1.2.3.4', 'access', 'OTHER@TESTNET1'),
         ('test2', '1.2.3.5', 'access', 'EVENT@TESTNET2')]
     expected_debug = {}
-    debug = {}
 
     expected_output = [
         actions.SnmpWalk(snmp.SnmpTarget(
@@ -48,10 +47,10 @@ class TestSuportvisor(unittest.TestCase):
           version=2, community='REMOVED', port=161)),
         actions.Summary(1234, 2)]
 
-    run = actions.RunInformation(tag='', debug=debug, trace=None)
+    run = actions.RunInformation()
     output = list(actions.Trigger().do(logic, run=run))
 
-    self.assertEqual(debug, expected_debug)
+    self.assertEqual(run.debug, expected_debug)
     self.assertEqual(len(expected_output), len(output))
     for expected, real in zip(expected_output, output):
       self.assertEqual(real, expected)

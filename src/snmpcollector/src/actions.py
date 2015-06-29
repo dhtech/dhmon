@@ -2,13 +2,23 @@ import abc
 import collections
 
 
-RunInformation = collections.namedtuple('RunInformation',
+BaseRunInformation = collections.namedtuple('RunInformation',
         ('tag', 'debug', 'trace'))
 
 AnnotatedResultEntry = collections.namedtuple('AnnotatedResultEntry',
     ('data', 'mib', 'obj', 'index', 'labels'))
 
 Statistics = collections.namedtuple('Statistics', ('timeouts', 'errors'))
+
+
+class RunInformation(BaseRunInformation):
+  def __new__(cls, tag='', debug=None, trace=None):
+    if debug is None:
+      debug = {}
+    if trace is None:
+      trace = {}
+    self = super(RunInformation, cls).__new__(cls, tag, debug, trace)
+    return self
 
 
 class Action(object):
