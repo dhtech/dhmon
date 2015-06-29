@@ -26,7 +26,7 @@ class Annotator(object):
     return self._mibresolver
 
   def do_result(self, run, target, results, stats):
-    annotations = config.get('annotator', 'annotations')
+    annotations = config.get('annotator', 'annotations') or []
 
     # Calculate map to skip annotation if we're sure we're not going to annotate
     # TODO(bluecmd): This could be cached
@@ -38,21 +38,22 @@ class Annotator(object):
 
     # Calculate annotator map
     split_oid_map = collections.defaultdict(dict)
-    for oid, result in results.iteritems():
+    for (oid, ctxt), result in results.iteritems():
       # We only support the last part of an OID as index for annotations
       key, index = oid.rsplit('.', 1)
       key += '.'
-      split_oid_map[key][index] = result.value
+      split_oid_map[(key, ctxt)][index] = result.value
 
     annotated_results = {}
-    for oid, result in results.iteritems():
+    for (oid, ctxt), result in results.iteritems():
       # Record some stats on how long time it took to get this metric
       elapsed = (time.time() - target.timestamp) * 1000 * 1000
       labels = {}
-      vlan = ''
+      vlan = None
 
-      if '@' in oid:
-        oid, vlan = oid.split('@')
+      # TODO(bluecmd): If we support more contexts we need to be smarter here
+      if not ctxt is None:
+        vlan = ctxt
 
       name = self.mibcache.get(oid, None)
       if name is None:
@@ -70,17 +71,21 @@ class Annotator(object):
       mib, part = name.split('::', 1)
       obj, index = part.split('.', 1) if '.' in part else (part, None)
 
-      labels = {'vlan': vlan}
-      labels.update(self.annotate(oid, annotation_map, split_oid_map, results))
+      labels = {}
+      if not vlan is None:
+        labels['vlan'] = vlan
+      labels.update(
+          self.annotate(
+            oid, ctxt, annotation_map, split_oid_map, results))
 
-      annotated_results[oid] = actions.AnnotatedResultEntry(
+      annotated_results[(oid, vlan)] = actions.AnnotatedResultEntry(
           result, mib, obj, index, labels)
 
     yield actions.AnnotatedResult(target, annotated_results, stats)
     logging.debug('Annotation completed for %d metrics for %s',
         len(annotated_results), target.host)
 
-  def annotate(self, oid, annotation_map, split_oid_map, results):
+  def annotate(self, oid, ctxt, annotation_map, split_oid_map, results):
     for key in annotation_map:
       if oid.startswith(key):
         break
@@ -92,9 +97,13 @@ class Annotator(object):
     labels = {}
     for label, annotation_oid in annotation_map[key].iteritems():
       annotation_key = annotation_oid + '.'
-      part = split_oid_map.get(annotation_key, None)
+      # Try to associate with context first
+      part = split_oid_map.get((annotation_key, ctxt), None)
       if not part:
-        continue
+        # Fall back to the global context
+        part = split_oid_map.get((annotation_key, None), None)
+        if not part:
+          continue
       value = part.get(index, None)
       if not value:
         continue

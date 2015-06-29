@@ -32,7 +32,8 @@ def _poll(data):
           'OID %s does not start with .1, please verify configuration', oid)
       continue
     try:
-      results.update(target.walk(oid, vlan))
+      results.update(
+          {(k, vlan): v for k, v in target.walk(oid, vlan).iteritems()})
     except snmp.TimeoutError, e:
       timeouts += 1
       if vlan:

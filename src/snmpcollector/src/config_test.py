@@ -45,6 +45,11 @@ snmp:
     self.assertEqual(config._config_object.incarnation, 2)
     self.assertEqual(mock_config.call_count, 3)
 
+  @mock.patch('config.Config.load')
+  def testNonExistant(self, mock_config):
+    mock_config.return_value = yaml.load('')
+    self.assertEqual(config.get('test', 'other', 'key'), None)
+
 
 def main():
   unittest.main()

@@ -27,7 +27,7 @@ class Config(object):
       return self._config
     new_config = None
     try:
-      new_config = self.load()
+      new_config = self.load() or dict()
       if new_config == self._config:
         return self._config
     except Exception:

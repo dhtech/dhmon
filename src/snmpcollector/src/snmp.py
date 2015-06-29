@@ -100,8 +100,6 @@ class SnmpTarget(object):
     nextoid = oid
     offset = 0
 
-    suffix = ('@%s' % vlan) if vlan else ''
-
     # Abort the walk when it exits the OID tree we are interested in
     while nextoid.startswith(oid):
       var_list = netsnmp.VarList(netsnmp.Varbind(nextoid, offset))
@@ -128,7 +126,7 @@ class SnmpTarget(object):
         # contained.
         if not currentoid.startswith(oid):
           break
-        ret[currentoid + suffix] = ResultTuple(result.val, result.type)
+        ret[currentoid] = ResultTuple(result.val, result.type)
       # Continue bulk walk
       offset = int(var_list[-1].iid)
       nextoid = var_list[-1].tag

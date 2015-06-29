@@ -88,7 +88,7 @@ class Exporter(object):
       SUMMARIES_COUNT.set(len(self.summaries))
 
   def _save(self, target, results):
-    for oid, result in results.iteritems():
+    for result in results.itervalues():
       self.export(target, result)
 
   def export(self, target, result):
