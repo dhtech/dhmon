@@ -1,12 +1,13 @@
 #!/usr/bin/env python2
-import actions
 import argparse
 import logging
 import sqlite3
 import sys
 import time
 
+import actions
 import config
+import mibresolver
 import supervisor
 import worker
 
@@ -18,6 +19,9 @@ parser.add_argument(
 parser.add_argument(
     '-o', '--oid', dest='oid', default=None,
     help='walk this oid')
+parser.add_argument(
+    '-n', '--numeric', dest='numeric', default=False, action='store_true',
+    help='do not resolve oids')
 parser.add_argument('target', help='target to poll')
 args = parser.parse_args()
 
@@ -54,7 +58,8 @@ if args.oid:
 else:
   for action in worker_stage.do_snmp_walk(actions.RunInformation(), target):
     for key in sorted(action.results.keys()):
-      print >>sys.stderr, key, action.results[key]
+      print >>sys.stderr, key if args.numeric else mibresolver.resolve(key),
+      print >>sys.stderr, action.results[key]
     logging.info('Run stats: %s', action.stats)
 
 logging.info('Duration: %s', time.time() - start)
