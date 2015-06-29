@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# TODO(bluecmd): Do arg parsing in trigger.py and replace this script
+# with a symlink
+
 if [[ "$1" == "--help" ]]; then
   echo "Usage: $0 [tag]"
   exit 1
