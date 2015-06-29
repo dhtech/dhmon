@@ -46,7 +46,7 @@ def _poll(data):
   return results, errors, timeouts
 
 
-class Worker(stage.Stage):
+class Worker(object):
 
   def __init__(self):
     super(Worker, self).__init__()
@@ -56,6 +56,7 @@ class Worker(stage.Stage):
 
   def gather_oids(self, target, model):
     if config.incarnation != self.model_oid_cache_incarnation:
+      self.model_oid_cache_incarnation = config.incarnation
       self.model_oid_cache = {}
 
     cache_key = (target.layer, model)
@@ -80,10 +81,10 @@ class Worker(stage.Stage):
             vlan_aware_oids.update(set(collection['oids']))
           else:
             oids.update(set(collection['oids']))
-    self.model_oid_cache[cache_key] = list(oids)
-    return list(oids), list(vlan_aware_oids)
+    self.model_oid_cache[cache_key] = (list(oids), list(vlan_aware_oids))
+    return self.model_oid_cache[cache_key]
 
-  def do_overrides(self, results):
+  def process_overrides(self, results):
     overrides = config.get('worker', 'override')
     if not overrides:
       return results
@@ -97,7 +98,7 @@ class Worker(stage.Stage):
             result.value, overrides[root])
     return overriden_results
 
-  def do_snmp_walk(self, target):
+  def do_snmp_walk(self, run, target):
     ret = self._walk(target)
     results, errors, timeouts = ret if not ret is None else ({}, 0, 1)
 
@@ -138,13 +139,13 @@ class Worker(stage.Stage):
     results = {}
     for part_results, part_errors, part_timeouts in self.pool.imap(
         _poll, to_poll):
-      results.update(self.do_overrides(part_results))
+      results.update(self.process_overrides(part_results))
       errors += part_errors
       timeouts += part_timeouts
     return results, errors, timeouts
 
 
 if __name__ == '__main__':
-  stage = Worker()
-  stage.listen(actions.SnmpWalk)
-  stage.run()
+  worker = stage.Stage(Worker())
+  worker.listen(actions.SnmpWalk)
+  worker.run()

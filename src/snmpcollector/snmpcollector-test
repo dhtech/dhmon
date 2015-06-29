@@ -1,0 +1,3 @@
+#!/bin/bash
+# TODO(bluecmd): Replace with symlink to snmptest.py
+python /usr/share/snmpcollector/snmptest.py $@

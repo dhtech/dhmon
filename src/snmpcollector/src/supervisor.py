@@ -9,7 +9,7 @@ import snmp
 import stage
 
 
-class Supervisor(stage.Stage):
+class Supervisor(object):
   """Single instance target enumerator.
 
   When triggered the supervisor will scan ipplan.db to find all
@@ -17,13 +17,22 @@ class Supervisor(stage.Stage):
   message to the workers.
   """
 
-  def construct_targets(self, timestamp):
+  def fetch_nodes(self):
     db = sqlite3.connect(config.get('ipplan'))
     cursor = db.cursor()
-    sql = ("SELECT h.name, h.ipv4_addr_txt, o.value FROM host h, option o "
-        "WHERE o.name = 'layer' AND h.node_id = o.node_id")
+    sql = ('SELECT h.name, h.ipv4_addr_txt, o.value, n.name '
+        'FROM host h, option o, network n '
+        'WHERE o.name = "layer" AND h.node_id = o.node_id '
+        'AND h.network_id = n.node_id')
+    # TODO(bluecmd): We should probably use an iterator here instead
+    return cursor.execute(sql).fetchall()
+
+  def construct_targets(self, timestamp):
     nodes = {}
-    for host, ip, layer in cursor.execute(sql).fetchall():
+    domain = config.get('domain').lower()
+    for host, ip, layer, network in self.fetch_nodes():
+      if network.split('@', 1)[0].lower() != domain:
+        continue
       layer_config = config.get('snmp', layer)
       if layer_config is None:
         logging.error('Unable to target "%s" since layer "%s" is unknown',
@@ -31,7 +40,7 @@ class Supervisor(stage.Stage):
         continue
       yield host, snmp.SnmpTarget(host, ip, timestamp, layer, **layer_config)
 
-  def do_trigger(self):
+  def do_trigger(self, run):
     timestamp = time.time()
 
     targets = 0
@@ -47,7 +56,7 @@ class Supervisor(stage.Stage):
 
 
 if __name__ == '__main__':
-  stage = Supervisor()
+  stage = stage.Stage(Supervisor())
   stage.purge(actions.Trigger)
   stage.listen(actions.Trigger)
   stage.run()

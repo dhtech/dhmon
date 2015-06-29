@@ -9,21 +9,23 @@ import config
 import stage
 
 
-class Annotator(stage.Stage):
+class Annotator(object):
   """Annotation step where results are given meaningful labels."""
 
   def __init__(self):
     super(Annotator, self).__init__()
     self.mibcache = {}
-    self.mibresolver = None
+    self._mibresolver = None
 
-  def startup(self):
-    super(Annotator, self).startup()
+  @property
+  def mibresolver(self):
     # Do the import here to not spam the terminal with netsnmp stuff
-    import mibresolver
-    self.mibresolver = mibresolver
+    if self._mibresolver is None:
+      import mibresolver
+      self._mibresolver = mibresolver
+    return self._mibresolver
 
-  def do_result(self, target, results, stats):
+  def do_result(self, run, target, results, stats):
     annotations = config.get('annotator', 'annotations')
 
     # Calculate map to skip annotation if we're sure we're not going to annotate
@@ -59,6 +61,10 @@ class Annotator(stage.Stage):
 
       if name is None:
         logging.warning('Failed to look up OID %s, ignoring', oid)
+        continue
+
+      if not '::' in name:
+        logging.warning('OID %s resolved to %s (no MIB), ignoring', oid, name)
         continue
 
       mib, part = name.split('::', 1)
@@ -97,6 +103,6 @@ class Annotator(stage.Stage):
 
 
 if __name__ == '__main__':
-  stage = Annotator()
-  stage.listen(actions.Result)
-  stage.run()
+  annotator = stage.Stage(Annotator())
+  annotator.listen(actions.Result)
+  annotator.run()
