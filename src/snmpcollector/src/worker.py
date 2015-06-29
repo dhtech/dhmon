@@ -81,8 +81,8 @@ class Worker(object):
             vlan_aware_oids.update(set(collection['oids']))
           else:
             oids.update(set(collection['oids']))
-    self.model_oid_cache[cache_key] = list(oids)
-    return list(oids), list(vlan_aware_oids)
+    self.model_oid_cache[cache_key] = (list(oids), list(vlan_aware_oids))
+    return self.model_oid_cache[cache_key]
 
   def process_overrides(self, results):
     overrides = config.get('worker', 'override')
