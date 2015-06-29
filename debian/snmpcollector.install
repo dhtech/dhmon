@@ -1,6 +1,4 @@
 opt/snmpcollector/src/* /usr/share/snmpcollector/
-opt/snmpcollector/snmpcollector-test /usr/bin/
-opt/snmpcollector/snmpcollector-trigger /usr/bin/
 etc/snmpcollector.yaml
 etc/default/snmpcollector
 etc/init.d/snmpcollector
