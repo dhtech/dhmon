@@ -173,6 +173,27 @@ annotator:
       {'interface': 'correct'}))
     self.runTest(expected, result, config)
 
+  def testMultiLevelAnnotationValue(self):
+    """Test multi level annotation via value."""
+    config = """
+annotator:
+  annotations:
+    - annotate:
+        - .1.2.3
+      with:
+        interface: $.1.2.4 > .1.2.5 > .10.1
+"""
+    result = self.createResult({
+      ('.1.2.3.1337', None): snmpResult(1),
+      ('.1.2.4.1', None): snmpResult(5),
+      ('.1.2.5.5', None): snmpResult(3),
+      ('.10.1.3', None): snmpResult('correct'),
+    })
+    expected = self.newExpectedFromResult(result)
+    expected.update(self.createResultEntry(('.1.2.3.1337', None), result,
+      {'interface': 'correct'}))
+    self.runTest(expected, result, config)
+
   def testMultiLevelAnnotationContext(self):
     """Test multi level annotation across contexts."""
     config = """

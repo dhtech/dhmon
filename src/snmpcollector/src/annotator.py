@@ -67,8 +67,6 @@ class Annotator(object):
       key = oid[:-(len(index))]
       split_oid_map[(key, ctxt)][index] = result.value
 
-    print split_oid_map
-
     annotated_results = {}
     for (oid, ctxt), result in results.iteritems():
       resolve = self.mibcache.get(oid, None)
@@ -132,10 +130,7 @@ class Annotator(object):
     else:
       return {}
 
-    # We only support the last part of an OID as index for annotations
-    index = oid[len(key):]
     labels = {}
-
     for label, annotation_path in annotation_map[key].iteritems():
       # Parse the annotation path
       annotation_keys = [x.strip() + '.' for x in annotation_path.split('>')]
@@ -145,8 +140,13 @@ class Annotator(object):
       # OID2.value1:value2
       # OID3.value3:final
       # label=final
-      value = index
+      index = oid[len(key):]
+      last_oid_visited = oid
       for annotation_key in annotation_keys:
+        use_value = annotation_key[0] == '$'
+        if use_value:
+          annotation_key = annotation_key[1:]
+
         # Try to associate with context first
         part = split_oid_map.get((annotation_key, ctxt), None)
         if not part:
@@ -161,10 +161,17 @@ class Annotator(object):
           ctxt = None
           if not part:
             continue
-        last_oid_visited = ''.join((annotation_key, value))
-        value = part.get(value, None)
-        if not value:
+
+        # We either use the last index or the OID value, deterimed by
+        # use_value above.
+        if use_value:
+          index = results[(last_oid_visited, ctxt)].value
+
+        last_oid_visited = ''.join((annotation_key, index))
+        index = part.get(index, None)
+        if not index:
           break
+      value = index
       if not value:
         continue
       # Try enum resolution
