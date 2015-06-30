@@ -33,7 +33,13 @@ def snmpResult(x, type=None):
 class MockMibResolver(object):
 
   def resolve_for_testing(self, oid):
-    key, index = oid.rsplit('.', 1)
+    for key in MIB_RESOLVER:
+      if oid.startswith(key + '.'):
+        break
+    else:
+      raise Exception('No MIB RESOLVER defined')
+
+    index = oid[len(key)+1:]
     return ('DUMMY-MIB', MIB_RESOLVER[key], index, ENUMS[key])
 
   def resolve(self, oid):
@@ -128,19 +134,19 @@ annotator:
       ('.1.2.3.1', None): snmpResult(1337),
       ('.1.2.3.3', None): snmpResult(1338),
       ('.1.2.4.1', None): snmpResult(1339),
-      ('.1.2.4.2', None): snmpResult(1340),
+      ('.1.2.4.3.2', None): snmpResult(1340),
       ('.1.2.4.1', '100'): snmpResult(1339),
       ('.10.1.1', None): snmpResult('interface1'),
-      ('.10.1.2', None): snmpResult('interface2'),
+      ('.10.1.3.2', None): snmpResult('interface2'),
       ('.10.2.1', None): snmpResult('alias1'),
-      ('.10.2.2', None): snmpResult('alias2'),
+      ('.10.2.3.2', None): snmpResult('alias2'),
     })
     expected = self.newExpectedFromResult(result)
     expected.update(self.createResultEntry(('.1.2.3.1', None), result,
       {'interface': 'interface1', 'alias': 'alias1'}))
     expected.update(self.createResultEntry(('.1.2.4.1', None), result,
       {'interface': 'interface1', 'alias': 'alias1'}))
-    expected.update(self.createResultEntry(('.1.2.4.2', None), result,
+    expected.update(self.createResultEntry(('.1.2.4.3.2', None), result,
       {'interface': 'interface2', 'alias': 'alias2'}))
     expected.update(self.createResultEntry(('.1.2.4.1', '100'), result,
       {'interface': 'interface1', 'alias': 'alias1'}))

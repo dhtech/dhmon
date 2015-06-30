@@ -45,23 +45,36 @@ class Annotator(object):
     labelification = set(
         [x + '.' for x in config.get('annotator', 'labelify') or []])
 
-    # Calculate annotator map
-    split_oid_map = collections.defaultdict(dict)
-    for (oid, ctxt), result in results.iteritems():
-      # We only support the last part of an OID as index for annotations
-      key, index = oid.rsplit('.', 1)
-      key += '.'
-      split_oid_map[(key, ctxt)][index] = result.value
-
     # Pre-fill the OID/Enum cache to allow annotations to get enum values
     for (oid, ctxt), result in results.iteritems():
       resolve = self.mibcache.get(oid, None)
       if resolve is None:
         resolve = self.mibresolver.resolve(oid)
         self.mibcache[oid] = resolve
+      if resolve is None:
+        logging.warning('Failed to look up OID %s, ignoring', oid)
+        continue
+
+    # Calculate annotator map
+    split_oid_map = collections.defaultdict(dict)
+    for (oid, ctxt), result in results.iteritems():
+      resolve = self.mibcache.get(oid, None)
+      if resolve is None:
+        continue
+      name, _ = resolve
+
+      _, index = name.split('.', 1)
+      key = oid[:-(len(index))]
+      split_oid_map[(key, ctxt)][index] = result.value
+
+    print split_oid_map
 
     annotated_results = {}
     for (oid, ctxt), result in results.iteritems():
+      resolve = self.mibcache.get(oid, None)
+      if resolve is None:
+        continue
+
       # Record some stats on how long time it took to get this metric
       elapsed = (time.time() - target.timestamp) * 1000 * 1000
       labels = {}
@@ -70,11 +83,6 @@ class Annotator(object):
       # TODO(bluecmd): If we support more contexts we need to be smarter here
       if not ctxt is None:
         vlan = ctxt
-
-      resolve = self.mibcache.get(oid, None)
-      if resolve is None:
-        logging.warning('Failed to look up OID %s, ignoring', oid)
-        continue
 
       name, enum = resolve
 
@@ -125,7 +133,7 @@ class Annotator(object):
       return {}
 
     # We only support the last part of an OID as index for annotations
-    _, index = oid.rsplit('.', 1)
+    index = oid[len(key):]
     labels = {}
 
     for label, annotation_path in annotation_map[key].iteritems():
