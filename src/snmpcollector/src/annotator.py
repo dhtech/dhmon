@@ -53,7 +53,6 @@ class Annotator(object):
       key += '.'
       split_oid_map[(key, ctxt)][index] = result.value
 
-
     # Pre-fill the OID/Enum cache to allow annotations to get enum values
     for (oid, ctxt), result in results.iteritems():
       resolve = self.mibcache.get(oid, None)
@@ -155,10 +154,20 @@ class Annotator(object):
           ctxt = None
           if not part:
             continue
+        last_oid_visited = ''.join((annotation_key, value))
         value = part.get(value, None)
 
       if not value:
         continue
+      # Try enum resolution
+      _, enum = self.mibcache[last_oid_visited]
+      if enum:
+        enum_value = enum.get(value, None)
+        if enum_value is None:
+          logging.warning('Got invalid enum value for %s (%s), ignoring',
+              oid, value)
+          continue
+        value = enum_value
       labels[label] = value.replace('"', '\\"')
     return labels
 

@@ -230,6 +230,31 @@ annotator:
       {'value': 'enumValue'}))
     self.runTest(expected, result, '')
 
+  def testEnumsAnnotation(self):
+    """Test conversion of enums to values in annotations."""
+    config = """
+annotator:
+  annotations:
+    - annotate:
+        - .1.2.3
+      with:
+        enum: .10.3
+"""
+
+    result = self.createResult({
+      ('.1.2.3.1', None): snmpResult(10),
+      ('.10.3.1', None): snmpResult(10),
+    })
+    identities = self.createResult({
+      ('.10.3.1', None): snmpResult('NaN', 'ANNOTATED'),
+    })
+    expected = self.newExpectedFromResult(result)
+    expected.update(self.createResultEntry(('.1.2.3.1', None), result,
+      {'enum': 'enumValue'}))
+    expected.update(self.createResultEntry(('.10.3.1', None), identities,
+      {'value': 'enumValue'}))
+    self.runTest(expected, result, config)
+
 
 def main():
   unittest.main()
