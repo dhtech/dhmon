@@ -57,6 +57,20 @@ snmp:
 
 annotator:
 
+  # Labelification is used to turn strings into labels on metrics that
+  # otherwise do not have any numeric data. The value will be fixed to 1
+  # and the string value will be moved to a label called 'value' and 'hex'.
+  # Use this if you don't have any sensible OID to annotate with the value or
+  # there isn't a 1:1 match between the index and the value you wish to use.
+  #
+  # 'value' contains the human readable characters only and is striped.
+  # 'hex' is the raw data but hex encoded.
+  # If the raw string value is empty the result is dropped
+  labelify:
+    - .1.3.6.1.2.1.47.1.1.1.1.9  # entPhysicalFirmwareRev
+    - .1.3.6.1.2.1.47.1.1.1.1.11 # entPhysicalSerialNum
+    - .1.3.6.1.2.1.47.1.1.1.1.13 # entPhysicalModelName
+
   annotations:
     - annotate:
         - .1.3.6.1.2.1.2.2.1            # ifTable
@@ -96,27 +110,6 @@ annotator:
         - .1.3.6.1.4.1.14179.2.1.1.1.38      # bsnDot11EssNumberOfMobileStation
       with:
         essid: .1.3.6.1.4.1.14179.2.1.1.1.2  # bsnDot11EssSsid
-
-  aggregate:
-    switch:
-      layers:
-        - access
-        - wifi
-        - dist
-        - core
-      properties:
-        model:
-          walk: .1.3.6.1.2.1.47.1.1.1.1.13 # entPhysicalModelName
-          find: non-empty-string
-        firmware:
-          walk: .1.3.6.1.2.1.47.1.1.1.1.9  # entPhysicalFirmwareRev
-          find: non-empty-string
-
-  convert:
-    .1.3.6.1.2.1.47.1.1.1.1.11: # entPhysicalSerialNum
-      value: 1
-      label: sn
-      keep-only: non-empty-string
 
 collection:
   Default OIDs:

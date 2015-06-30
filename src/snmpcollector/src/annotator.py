@@ -53,6 +53,14 @@ class Annotator(object):
       key += '.'
       split_oid_map[(key, ctxt)][index] = result.value
 
+
+    # Pre-fill the OID/Enum cache to allow annotations to get enum values
+    for (oid, ctxt), result in results.iteritems():
+      resolve = self.mibcache.get(oid, None)
+      if resolve is None:
+        resolve = self.mibresolver.resolve(oid)
+        self.mibcache[oid] = resolve
+
     annotated_results = {}
     for (oid, ctxt), result in results.iteritems():
       # Record some stats on how long time it took to get this metric
@@ -64,14 +72,12 @@ class Annotator(object):
       if not ctxt is None:
         vlan = ctxt
 
-      name = self.mibcache.get(oid, None)
-      if name is None:
-        name = self.mibresolver.resolve(oid)
-        self.mibcache[oid] = name
-
-      if name is None:
+      resolve = self.mibcache.get(oid, None)
+      if resolve is None:
         logging.warning('Failed to look up OID %s, ignoring', oid)
         continue
+
+      name, enum = resolve
 
       if not '::' in name:
         logging.warning('OID %s resolved to %s (no MIB), ignoring', oid, name)
@@ -94,7 +100,17 @@ class Annotator(object):
           continue
         labels['value'] = self.string_to_label_value(result.value)
         labels['hex'] = binascii.hexlify(result.value)
-        result = snmp.ResultTuple('1', 'INTEGER')
+        result = snmp.ResultTuple('NaN', 'ANNOTATED')
+
+      # Do something almost like labelification for enums
+      if enum:
+        enum_value = enum.get(result.value, None)
+        if enum_value is None:
+          logging.warning('Got invalid enum value for %s (%s), ignoring',
+              oid, result.value)
+          continue
+        labels['value'] = enum_value
+        result = snmp.ResultTuple('NaN', 'ANNOTATED')
 
       annotated_results[(oid, vlan)] = actions.AnnotatedResultEntry(
           result, mib, obj, index, labels)

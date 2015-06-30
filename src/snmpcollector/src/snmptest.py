@@ -73,10 +73,20 @@ if args.oid:
 else:
   for action in worker_stage.do_snmp_walk(actions.RunInformation(), target):
     for (oid, ctxt) in sorted(action.results.keys()):
-      print oid if args.numeric else mibresolver.resolve(oid),
+      enum = {}
+      if args.numeric:
+        print oid,
+      else:
+        obj, enum = mibresolver.resolve(oid)
+        print obj,
       if ctxt:
         print '(%s)' % ctxt,
-      print action.results[(oid, ctxt)]
+      print action.results[(oid, ctxt)],
+      if enum:
+        print 'value translates to "%s"' % (
+            enum.get(action.results[(oid, ctxt)].value,
+                     '<INVALID ENUM VALUE>')),
+      print
     logging.info('Run stats: %s', action.stats)
 
 logging.info('Duration: %s', time.time() - start)

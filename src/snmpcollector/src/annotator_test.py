@@ -1,4 +1,5 @@
 import binascii
+import collections
 import mock
 import unittest
 import yaml
@@ -14,25 +15,30 @@ MIB_RESOLVER = {
     '.1.2.4': 'testInteger2',
     '.1.2.5': 'testInteger3',
     '.10.1': 'interfaceString',
-    '.10.2': 'aliasString'
+    '.10.2': 'aliasString',
+    '.10.3': 'enumString'
 }
 
+ENUMS = collections.defaultdict(dict)
+ENUMS['.10.3'] = {'10': 'enumValue'}
 
-def snmpResult(x):
+
+def snmpResult(x, type=None):
   # We don't care about the type in the annotator
-  return snmp.ResultTuple(
-      str(x), 'INTEGER' if isinstance(x, int) else 'OCTETSTR')
+  if type is None:
+    type = 'INTEGER' if isinstance(x, int) else 'OCTETSTR'
+  return snmp.ResultTuple(str(x), type)
 
 
 class MockMibResolver(object):
 
   def resolve_for_testing(self, oid):
     key, index = oid.rsplit('.', 1)
-    return ('DUMMY-MIB', MIB_RESOLVER[key], index)
+    return ('DUMMY-MIB', MIB_RESOLVER[key], index, ENUMS[key])
 
   def resolve(self, oid):
-    mib, obj, index = self.resolve_for_testing(oid)
-    return '%s::%s.%s' % (mib, obj, index)
+    mib, obj, index, enum = self.resolve_for_testing(oid)
+    return '%s::%s.%s' % (mib, obj, index), enum
 
 
 class TestAnnotator(unittest.TestCase):
@@ -70,7 +76,7 @@ class TestAnnotator(unittest.TestCase):
   def createResultEntry(self, key, result, labels):
     # mib/objs etc. is tested in testResult so we can assume they are correct
     oid, ctxt = key
-    mib, obj, index = self.mibresolver.resolve_for_testing(oid)
+    mib, obj, index, _ = self.mibresolver.resolve_for_testing(oid)
     if not ctxt is None:
       labels = dict(labels)
       labels['vlan'] = ctxt
@@ -197,8 +203,8 @@ annotator:
       ('.10.2.4', None): snmpResult(2),
     })
     identities = self.createResult({
-      ('.10.2.1', None): snmpResult(1),
-      ('.10.2.2', None): snmpResult(1),
+      ('.10.2.1', None): snmpResult('NaN', 'ANNOTATED'),
+      ('.10.2.2', None): snmpResult('NaN', 'ANNOTATED'),
     })
     expected = self.newExpectedFromResult(result)
     expected.update(self.createResultEntry(('.10.2.1', None), identities,
@@ -210,6 +216,19 @@ annotator:
     # Only strings are labelified
     del expected[('.10.2.4', None)]
     self.runTest(expected, result, config)
+
+  def testEnums(self):
+    """Test conversion of enums to values."""
+    result = self.createResult({
+      ('.10.3.1', None): snmpResult(10),
+    })
+    identities = self.createResult({
+      ('.10.3.1', None): snmpResult('NaN', 'ANNOTATED'),
+    })
+    expected = self.newExpectedFromResult(result)
+    expected.update(self.createResultEntry(('.10.3.1', None), identities,
+      {'value': 'enumValue'}))
+    self.runTest(expected, result, '')
 
 
 def main():
