@@ -1,3 +1,4 @@
+import binascii
 import mock
 import unittest
 import yaml
@@ -19,7 +20,8 @@ MIB_RESOLVER = {
 
 def snmpResult(x):
   # We don't care about the type in the annotator
-  return snmp.ResultTuple(x, 'UNKNOWN')
+  return snmp.ResultTuple(
+      str(x), 'INTEGER' if isinstance(x, int) else 'OCTETSTR')
 
 
 class MockMibResolver(object):
@@ -93,13 +95,13 @@ class TestAnnotator(unittest.TestCase):
   def testResult(self):
     """Test that results are propagated as we want."""
     result = self.createResult(results={
-      ('.1.2.4.1', '100'): snmpResult('1337')
+      ('.1.2.4.1', '100'): snmpResult(1337)
     })
     # NOTE(bluecmd): Do *not* use createResultEntry here to make sure the
     # assumptions we're doing in that function are holding.
     expected = {
       ('.1.2.4.1', '100'): actions.AnnotatedResultEntry(
-        data=snmpResult('1337'), mib='DUMMY-MIB', obj='testInteger2',
+        data=snmpResult(1337), mib='DUMMY-MIB', obj='testInteger2',
         index='1', labels={'vlan': '100'})
     }
     self.runTest(expected, result, '')
@@ -117,11 +119,11 @@ annotator:
         alias: .10.2
 """
     result = self.createResult({
-      ('.1.2.3.1', None): snmpResult('1337'),
-      ('.1.2.3.3', None): snmpResult('1338'),
-      ('.1.2.4.1', None): snmpResult('1339'),
-      ('.1.2.4.2', None): snmpResult('1340'),
-      ('.1.2.4.1', '100'): snmpResult('1339'),
+      ('.1.2.3.1', None): snmpResult(1337),
+      ('.1.2.3.3', None): snmpResult(1338),
+      ('.1.2.4.1', None): snmpResult(1339),
+      ('.1.2.4.2', None): snmpResult(1340),
+      ('.1.2.4.1', '100'): snmpResult(1339),
       ('.10.1.1', None): snmpResult('interface1'),
       ('.10.1.2', None): snmpResult('interface2'),
       ('.10.2.1', None): snmpResult('alias1'),
@@ -149,9 +151,9 @@ annotator:
         interface: .1.2.4 > .1.2.5 > .10.1
 """
     result = self.createResult({
-      ('.1.2.3.1', None): snmpResult('1337'),
-      ('.1.2.4.1', None): snmpResult('5'),
-      ('.1.2.5.5', None): snmpResult('3'),
+      ('.1.2.3.1', None): snmpResult(1337),
+      ('.1.2.4.1', None): snmpResult(5),
+      ('.1.2.5.5', None): snmpResult(3),
       ('.10.1.3', None): snmpResult('correct'),
     })
     expected = self.newExpectedFromResult(result)
@@ -170,14 +172,43 @@ annotator:
         interface: .1.2.4 > .1.2.5 > .10.1
 """
     result = self.createResult({
-      ('.1.2.3.1', '100'): snmpResult('1337'),
-      ('.1.2.4.1', '100'): snmpResult('5'),
-      ('.1.2.5.5', None): snmpResult('3'),
+      ('.1.2.3.1', '100'): snmpResult(1337),
+      ('.1.2.4.1', '100'): snmpResult(5),
+      ('.1.2.5.5', None): snmpResult(3),
       ('.10.1.3', None): snmpResult('correct'),
     })
     expected = self.newExpectedFromResult(result)
     expected.update(self.createResultEntry(('.1.2.3.1', '100'), result,
       {'interface': 'correct'}))
+    self.runTest(expected, result, config)
+
+
+  def testLabelify(self):
+    """Test conversion of strings to values."""
+    config = """
+annotator:
+  labelify:
+    - .10.2
+"""
+    result = self.createResult({
+      ('.10.2.1', None): snmpResult('correct'),
+      ('.10.2.2', None): snmpResult('\xffabc\xff '),
+      ('.10.2.3', None): snmpResult(''),
+      ('.10.2.4', None): snmpResult(2),
+    })
+    identities = self.createResult({
+      ('.10.2.1', None): snmpResult(1),
+      ('.10.2.2', None): snmpResult(1),
+    })
+    expected = self.newExpectedFromResult(result)
+    expected.update(self.createResultEntry(('.10.2.1', None), identities,
+      {'value': 'correct', 'hex': binascii.hexlify('correct')}))
+    expected.update(self.createResultEntry(('.10.2.2', None), identities,
+      {'value': 'abc', 'hex': binascii.hexlify('\xffabc\xff ')}))
+    # Empty strings should not be included
+    del expected[('.10.2.3', None)]
+    # Only strings are labelified
+    del expected[('.10.2.4', None)]
     self.runTest(expected, result, config)
 
 

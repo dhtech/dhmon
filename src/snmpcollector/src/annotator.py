@@ -1,16 +1,22 @@
 #!/usr/bin/env python2
-import base64
+import binascii
 import collections
 import logging
 import time
 
 import actions
 import config
+import snmp
 import stage
 
 
 class Annotator(object):
   """Annotation step where results are given meaningful labels."""
+
+  LABEL_TYPES = set(['OCTETSTR', 'IPADDR'])
+  ALLOWED_CHARACTERS = (
+      '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ ')
 
   def __init__(self):
     super(Annotator, self).__init__()
@@ -35,6 +41,9 @@ class Annotator(object):
       for annotate in annotation['annotate']:
         # Add '.' to not match .1.2.3 if we want to annotate 1.2.30
         annotation_map[annotate + '.'] = annotation['with']
+
+    labelification = set(
+        [x + '.' for x in config.get('annotator', 'labelify') or []])
 
     # Calculate annotator map
     split_oid_map = collections.defaultdict(dict)
@@ -77,6 +86,15 @@ class Annotator(object):
       labels.update(
           self.annotate(
             oid, ctxt, annotation_map, split_oid_map, results))
+
+      # Handle labelification
+      if oid[:-len(index)] in labelification:
+        # Skip empty strings or non-strings that are up for labelification
+        if result.value == '' or result.type not in self.LABEL_TYPES:
+          continue
+        labels['value'] = self.string_to_label_value(result.value)
+        labels['hex'] = binascii.hexlify(result.value)
+        result = snmp.ResultTuple('1', 'INTEGER')
 
       annotated_results[(oid, vlan)] = actions.AnnotatedResultEntry(
           result, mib, obj, index, labels)
@@ -127,6 +145,10 @@ class Annotator(object):
         continue
       labels[label] = value.replace('"', '\\"')
     return labels
+
+  def string_to_label_value(self, value):
+    value = ''.join(x for x in value.strip() if x in self.ALLOWED_CHARACTERS)
+    return value.strip()
 
 
 if __name__ == '__main__':
