@@ -124,8 +124,7 @@ class TestAnnotator(unittest.TestCase):
 annotator:
   annotations:
     - annotate:
-        - .1.2.3
-        - .1.2.4
+        - .1.2
       with:
         interface: .10.1
         alias: .10.2

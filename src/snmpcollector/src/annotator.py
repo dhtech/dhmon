@@ -96,7 +96,7 @@ class Annotator(object):
         labels['vlan'] = vlan
       labels.update(
           self.annotate(
-            oid, ctxt, annotation_map, split_oid_map, results))
+            oid, index, ctxt, annotation_map, split_oid_map, results))
 
       # Handle labelification
       if oid[:-len(index)] in labelification:
@@ -123,68 +123,75 @@ class Annotator(object):
     logging.debug('Annotation completed for %d metrics for %s',
         len(annotated_results), target.host)
 
-  def annotate(self, oid, ctxt, annotation_map, split_oid_map, results):
+  def annotate(self, oid, index, ctxt, annotation_map, split_oid_map, results):
     for key in annotation_map:
       if oid.startswith(key):
         break
     else:
       return {}
 
+    saved_index = index
     labels = {}
     for label, annotation_path in annotation_map[key].iteritems():
       # Parse the annotation path
       annotation_keys = [x.strip() + '.' for x in annotation_path.split('>')]
 
-      # Jump across the path seperated like:
-      # OID.idx:value1
-      # OID2.value1:value2
-      # OID3.value3:final
-      # label=final
-      index = oid[len(key):]
-      last_oid_visited = oid
-      for annotation_key in annotation_keys:
-        use_value = annotation_key[0] == '$'
-        if use_value:
-          annotation_key = annotation_key[1:]
-
-        # Try to associate with context first
-        part = split_oid_map.get((annotation_key, ctxt), None)
-        if not part:
-          # Fall back to the global context
-          part = split_oid_map.get((annotation_key, None), None)
-          # Do not allow going back into context when you have jumped into
-          # the global one.
-          # TODO(bluecmd): I have no reason *not* to support this more than
-          # it feels like an odd behaviour and not something I would be
-          # expecting the software to do, so let's not do that unless we find
-          # a usecase in the future.
-          ctxt = None
-          if not part:
-            continue
-
-        # We either use the last index or the OID value, deterimed by
-        # use_value above.
-        if use_value:
-          index = results[(last_oid_visited, ctxt)].value
-
-        last_oid_visited = ''.join((annotation_key, index))
-        index = part.get(index, None)
-        if not index:
-          break
-      value = index
-      if not value:
+      value = self.jump_to_value(
+          annotation_keys, oid, ctxt, index, split_oid_map, results)
+      if value is None:
         continue
-      # Try enum resolution
-      _, enum = self.mibcache[last_oid_visited]
-      if enum:
-        enum_value = enum.get(value, None)
-        if enum_value is None:
-          logging.warning('Got invalid enum value for %s (%s), ignoring',
-              oid, value)
-          continue
-        value = enum_value
+
       labels[label] = value.replace('"', '\\"')
     return labels
+
+  def jump_to_value(self, keys, oid, ctxt, index, split_oid_map, results):
+    # Jump across the path seperated like:
+    # OID.idx:value1
+    # OID2.value1:value2
+    # OID3.value3:final
+    # label=final
+    for key in keys:
+      use_value = key[0] == '$'
+      if use_value:
+        key = key[1:]
+
+      # Try to associate with context first
+      part = split_oid_map.get((key, ctxt), None)
+      if not part:
+        # Fall back to the global context
+        part = split_oid_map.get((key, None), None)
+        # Do not allow going back into context when you have jumped into
+        # the global one.
+        # TODO(bluecmd): I have no reason *not* to support this more than
+        # it feels like an odd behaviour and not something I would be
+        # expecting the software to do, so let's not do that unless we find
+        # a usecase in the future.
+        ctxt = None
+        if not part:
+          continue
+
+      # We either use the last index or the OID value, deterimed by
+      # use_value above.
+      if use_value:
+        index = results[(oid, ctxt)].value
+
+      oid = ''.join((key, index))
+      index = part.get(index, None)
+      if not index:
+        return None
+
+    value = index
+
+    # Try enum resolution
+    _, enum = self.mibcache[oid]
+    if enum:
+      enum_value = enum.get(value, None)
+      if enum_value is None:
+        logging.warning('Got invalid enum value for %s (%s), ignoring',
+            oid, value)
+        return None
+      value = enum_value
+    return value
 
   def string_to_label_value(self, value):
     value = ''.join(x for x in value.strip() if x in self.ALLOWED_CHARACTERS)
