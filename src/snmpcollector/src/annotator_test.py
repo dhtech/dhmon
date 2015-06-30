@@ -11,24 +11,36 @@ import snmp
 MIB_RESOLVER = {
     '.1.2.3': 'testInteger1',
     '.1.2.4': 'testInteger2',
+    '.1.2.5': 'testInteger3',
     '.10.1': 'interfaceString',
     '.10.2': 'aliasString'
 }
 
 
+def snmpResult(x):
+  # We don't care about the type in the annotator
+  return snmp.ResultTuple(x, 'UNKNOWN')
+
+
 class MockMibResolver(object):
 
-  def resolve(self, oid):
+  def resolve_for_testing(self, oid):
     key, index = oid.rsplit('.', 1)
-    return 'DUMMY-MIB::' + '.'.join((MIB_RESOLVER[key], index))
+    return ('DUMMY-MIB', MIB_RESOLVER[key], index)
+
+  def resolve(self, oid):
+    mib, obj, index = self.resolve_for_testing(oid)
+    return '%s::%s.%s' % (mib, obj, index)
 
 
 class TestAnnotator(unittest.TestCase):
 
   def setUp(self):
     self.logic = annotator.Annotator()
-    self.logic._mibresolver = MockMibResolver()
+    self.mibresolver = MockMibResolver()
+    self.logic._mibresolver = self.mibresolver
     self.run = actions.RunInformation()
+    config.refresh()
 
   def createResult(self, results, timeouts=0, errors=0):
     target = snmp.SnmpTarget(
@@ -53,9 +65,24 @@ class TestAnnotator(unittest.TestCase):
         print oid, v
     self.assertEquals(output, expected_output)
 
-  def createResultEntry(self, key, result, **kwargs):
+  def createResultEntry(self, key, result, labels):
+    # mib/objs etc. is tested in testResult so we can assume they are correct
+    oid, ctxt = key
+    mib, obj, index = self.mibresolver.resolve_for_testing(oid)
+    if not ctxt is None:
+      labels = dict(labels)
+      labels['vlan'] = ctxt
     return {key: actions.AnnotatedResultEntry(
-      data=result.results[key], **kwargs)}
+      result.results[key], mib, obj, index, labels)}
+
+  def newExpectedFromResult(self, result):
+    # We will most likely just pass through a lot of the results, so create
+    # the basic annotated entries and just operate on the edge cases we are
+    # testing.
+    expected = {}
+    for (key, ctxt), value in result.results.iteritems():
+      expected.update(self.createResultEntry((key, ctxt), result, {}))
+    return expected
 
   def testSmokeTest(self):
     """Test empty config and empty SNMP result."""
@@ -66,11 +93,14 @@ class TestAnnotator(unittest.TestCase):
   def testResult(self):
     """Test that results are propagated as we want."""
     result = self.createResult(results={
-      ('.1.2.4.1', '100'): snmp.ResultTuple('1337', 'INTEGER')})
+      ('.1.2.4.1', '100'): snmpResult('1337')
+    })
+    # NOTE(bluecmd): Do *not* use createResultEntry here to make sure the
+    # assumptions we're doing in that function are holding.
     expected = {
       ('.1.2.4.1', '100'): actions.AnnotatedResultEntry(
-        data=snmp.ResultTuple(value='1337', type='INTEGER'),
-        mib='DUMMY-MIB', obj='testInteger2', index='1', labels={'vlan': '100'})
+        data=snmpResult('1337'), mib='DUMMY-MIB', obj='testInteger2',
+        index='1', labels={'vlan': '100'})
     }
     self.runTest(expected, result, '')
 
@@ -87,23 +117,67 @@ annotator:
         alias: .10.2
 """
     result = self.createResult({
-      ('.1.2.3.1', None): snmp.ResultTuple('1337', 'INTEGER'),
-      ('.1.2.3.3', None): snmp.ResultTuple('1338', 'INTEGER'),
-      ('.1.2.4.1', None): snmp.ResultTuple('1339', 'INTEGER'),
-      ('.1.2.4.2', None): snmp.ResultTuple('1340', 'GAUGE'),
-      ('.1.2.4.1', '100'): snmp.ResultTuple('1339', 'INTEGER'),
+      ('.1.2.3.1', None): snmpResult('1337'),
+      ('.1.2.3.3', None): snmpResult('1338'),
+      ('.1.2.4.1', None): snmpResult('1339'),
+      ('.1.2.4.2', None): snmpResult('1340'),
+      ('.1.2.4.1', '100'): snmpResult('1339'),
+      ('.10.1.1', None): snmpResult('interface1'),
+      ('.10.1.2', None): snmpResult('interface2'),
+      ('.10.2.1', None): snmpResult('alias1'),
+      ('.10.2.2', None): snmpResult('alias2'),
     })
-    expected = {}
+    expected = self.newExpectedFromResult(result)
     expected.update(self.createResultEntry(('.1.2.3.1', None), result,
-      mib='DUMMY-MIB', obj='testInteger1', index='1', labels={}))
-    expected.update(self.createResultEntry(('.1.2.3.3', None), result,
-      mib='DUMMY-MIB', obj='testInteger1', index='3', labels={}))
+      {'interface': 'interface1', 'alias': 'alias1'}))
     expected.update(self.createResultEntry(('.1.2.4.1', None), result,
-      mib='DUMMY-MIB', obj='testInteger2', index='1', labels={}))
+      {'interface': 'interface1', 'alias': 'alias1'}))
     expected.update(self.createResultEntry(('.1.2.4.2', None), result,
-      mib='DUMMY-MIB', obj='testInteger2', index='2', labels={}))
+      {'interface': 'interface2', 'alias': 'alias2'}))
     expected.update(self.createResultEntry(('.1.2.4.1', '100'), result,
-      mib='DUMMY-MIB', obj='testInteger2', index='1', labels={'vlan': '100'}))
+      {'interface': 'interface1', 'alias': 'alias1'}))
+    self.runTest(expected, result, config)
+
+  def testMultiLevelAnnotation(self):
+    """Test multi level annotation."""
+    config = """
+annotator:
+  annotations:
+    - annotate:
+        - .1.2.3
+      with:
+        interface: .1.2.4 > .1.2.5 > .10.1
+"""
+    result = self.createResult({
+      ('.1.2.3.1', None): snmpResult('1337'),
+      ('.1.2.4.1', None): snmpResult('5'),
+      ('.1.2.5.5', None): snmpResult('3'),
+      ('.10.1.3', None): snmpResult('correct'),
+    })
+    expected = self.newExpectedFromResult(result)
+    expected.update(self.createResultEntry(('.1.2.3.1', None), result,
+      {'interface': 'correct'}))
+    self.runTest(expected, result, config)
+
+  def testMultiLevelAnnotationContext(self):
+    """Test multi level annotation across contexts."""
+    config = """
+annotator:
+  annotations:
+    - annotate:
+        - .1.2.3
+      with:
+        interface: .1.2.4 > .1.2.5 > .10.1
+"""
+    result = self.createResult({
+      ('.1.2.3.1', '100'): snmpResult('1337'),
+      ('.1.2.4.1', '100'): snmpResult('5'),
+      ('.1.2.5.5', None): snmpResult('3'),
+      ('.10.1.3', None): snmpResult('correct'),
+    })
+    expected = self.newExpectedFromResult(result)
+    expected.update(self.createResultEntry(('.1.2.3.1', '100'), result,
+      {'interface': 'correct'}))
     self.runTest(expected, result, config)
 
 

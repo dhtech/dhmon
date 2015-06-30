@@ -95,16 +95,34 @@ class Annotator(object):
     # We only support the last part of an OID as index for annotations
     _, index = oid.rsplit('.', 1)
     labels = {}
-    for label, annotation_oid in annotation_map[key].iteritems():
-      annotation_key = annotation_oid + '.'
-      # Try to associate with context first
-      part = split_oid_map.get((annotation_key, ctxt), None)
-      if not part:
-        # Fall back to the global context
-        part = split_oid_map.get((annotation_key, None), None)
+
+    for label, annotation_path in annotation_map[key].iteritems():
+      # Parse the annotation path
+      annotation_keys = [x.strip() + '.' for x in annotation_path.split('>')]
+
+      # Jump across the path seperated like:
+      # OID.idx:value1
+      # OID2.value1:value2
+      # OID3.value3:final
+      # label=final
+      value = index
+      for annotation_key in annotation_keys:
+        # Try to associate with context first
+        part = split_oid_map.get((annotation_key, ctxt), None)
         if not part:
-          continue
-      value = part.get(index, None)
+          # Fall back to the global context
+          part = split_oid_map.get((annotation_key, None), None)
+          # Do not allow going back into context when you have jumped into
+          # the global one.
+          # TODO(bluecmd): I have no reason *not* to support this more than
+          # it feels like an odd behaviour and not something I would be
+          # expecting the software to do, so let's not do that unless we find
+          # a usecase in the future.
+          ctxt = None
+          if not part:
+            continue
+        value = part.get(value, None)
+
       if not value:
         continue
       labels[label] = value.replace('"', '\\"')

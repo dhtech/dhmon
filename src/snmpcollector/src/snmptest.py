@@ -72,9 +72,11 @@ if args.oid:
     print i
 else:
   for action in worker_stage.do_snmp_walk(actions.RunInformation(), target):
-    for key in sorted(action.results.keys()):
-      print key if args.numeric else mibresolver.resolve(key),
-      print action.results[key]
+    for (oid, ctxt) in sorted(action.results.keys()):
+      print oid if args.numeric else mibresolver.resolve(oid),
+      if ctxt:
+        print '(%s)' % ctxt,
+      print action.results[(oid, ctxt)]
     logging.info('Run stats: %s', action.stats)
 
 logging.info('Duration: %s', time.time() - start)

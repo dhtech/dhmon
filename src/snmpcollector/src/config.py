@@ -39,6 +39,9 @@ class Config(object):
     self._config = new_config
     return new_config
 
+  def refresh(self):
+    self.timestamp = 0
+
 
 _config_object = Config()
 
@@ -52,6 +55,10 @@ def get(*path):
 
   return ret
 
-@property
+
 def incarnation():
   return _config_object.incarnation
+
+
+def refresh():
+  _config_object.refresh()
