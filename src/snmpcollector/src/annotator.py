@@ -156,7 +156,8 @@ class Annotator(object):
             continue
         last_oid_visited = ''.join((annotation_key, value))
         value = part.get(value, None)
-
+        if not value:
+          break
       if not value:
         continue
       # Try enum resolution
