@@ -43,7 +43,8 @@ COMPLETED_POLL_COUNT = prometheus_client.Counter(
 class Exporter(object):
 
   NUMERIC_TYPES = set([
-    'COUNTER', 'COUNTER64', 'INTEGER', 'TICKS', 'GAUGE', 'ANNOTATED'])
+    'COUNTER', 'COUNTER64', 'INTEGER', 'INTEGER32', 'TICKS',
+    'GAUGE', 'ANNOTATED'])
 
   def __init__(self):
     super(Exporter, self).__init__()
