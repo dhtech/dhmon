@@ -108,8 +108,7 @@ class Annotator(object):
           logging.warning('Got invalid enum value for %s (%s), ignoring',
               oid, result.value)
           continue
-        labels['value'] = enum_value
-        result = snmp.ResultTuple('NaN', 'ANNOTATED')
+        labels['enum'] = enum_value
 
       annotated_results[(oid, vlan)] = actions.AnnotatedResultEntry(
           result, mib, obj, index, labels)
