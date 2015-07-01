@@ -111,10 +111,10 @@ class Annotator(object):
       if enum:
         enum_value = enum.get(result.value, None)
         if enum_value is None:
-          logging.warning('Got invalid enum value for %s (%s), ignoring',
+          logging.warning('Got invalid enum value for %s (%s), not labling',
               oid, result.value)
-          continue
-        labels['enum'] = enum_value
+        else:
+          labels['enum'] = enum_value
 
       annotated_results[(oid, vlan)] = actions.AnnotatedResultEntry(
           result, mib, obj, index, labels)

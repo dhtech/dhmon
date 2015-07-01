@@ -214,6 +214,24 @@ annotator:
       {'interface': 'correct'}))
     self.runTest(expected, result, config)
 
+  def testMultiLevelAnnotationBroken(self):
+    """Test multi level annotation where we do not have a match."""
+    config = """
+annotator:
+  annotations:
+    - annotate:
+        - .1.2.3
+      with:
+        interface: .1.2.4 > .1.2.5 > .10.1
+"""
+    result = self.createResult({
+      ('.1.2.3.1', '100'): snmpResult(1337),
+      ('.1.2.4.1', '100'): snmpResult(6),
+      ('.1.2.5.5', None): snmpResult(3),
+      ('.10.1.3', None): snmpResult('dummy'),
+    })
+    expected = self.newExpectedFromResult(result)
+    self.runTest(expected, result, config)
 
   def testLabelify(self):
     """Test conversion of strings to values."""
@@ -251,6 +269,14 @@ annotator:
     expected = self.newExpectedFromResult(result)
     expected.update(self.createResultEntry(('.10.3.1', None), result,
       {'enum': 'enumValue'}))
+    self.runTest(expected, result, '')
+
+  def testEnumsInvalid(self):
+    """Test conversion of enums to values (invalid value)."""
+    result = self.createResult({
+      ('.10.3.1', None): snmpResult(9),
+    })
+    expected = self.newExpectedFromResult(result)
     self.runTest(expected, result, '')
 
   def testEnumsAnnotation(self):
