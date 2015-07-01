@@ -233,6 +233,25 @@ annotator:
     expected = self.newExpectedFromResult(result)
     self.runTest(expected, result, config)
 
+  def testMultiLevelAnnotationNonExistant(self):
+    """Test multi level annotation where we didn't scrape the OID."""
+    config = """
+annotator:
+  annotations:
+    - annotate:
+        - .1.2.3
+      with:
+        interface: .1.2.4 > .1.2.6 > .10.1
+"""
+    result = self.createResult({
+      ('.1.2.3.1', '100'): snmpResult(1337),
+      ('.1.2.4.1', '100'): snmpResult(5),
+      ('.1.2.5.5', None): snmpResult(3),
+      ('.10.1.3', None): snmpResult('dummy'),
+    })
+    expected = self.newExpectedFromResult(result)
+    self.runTest(expected, result, config)
+
   def testLabelify(self):
     """Test conversion of strings to values."""
     config = """
