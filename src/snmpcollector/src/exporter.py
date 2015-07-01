@@ -42,7 +42,9 @@ COMPLETED_POLL_COUNT = prometheus_client.Counter(
 
 class Exporter(object):
 
-  NUMERIC_TYPES = ['COUNTER', 'COUNTER64', 'INTEGER', 'TICKS', 'GAUGE']
+  NUMERIC_TYPES = set([
+    'COUNTER', 'COUNTER64', 'INTEGER', 'INTEGER32', 'TICKS',
+    'GAUGE', 'ANNOTATED'])
 
   def __init__(self):
     super(Exporter, self).__init__()
@@ -88,7 +90,7 @@ class Exporter(object):
       SUMMARIES_COUNT.set(len(self.summaries))
 
   def _save(self, target, results):
-    for oid, result in results.iteritems():
+    for result in results.itervalues():
       self.export(target, result)
 
   def export(self, target, result):

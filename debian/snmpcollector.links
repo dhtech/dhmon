@@ -1,0 +1,2 @@
+/usr/share/snmpcollector/trigger.py /usr/bin/snmpcollector-trigger
+/usr/share/snmpcollector/snmptest.py /usr/bin/snmpcollector-test

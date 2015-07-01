@@ -1,5 +1,7 @@
 import collections
 import logging
+import os
+import sys
 
 
 _NETSNMP_CACHE = None
@@ -60,32 +62,48 @@ class SnmpTarget(object):
     # Since pickle will import this module we do not want to drag netsnmp into
     # this on every load. Load it when we need it.
     global _NETSNMP_CACHE
+    first_load = False
     if _NETSNMP_CACHE is None:
+      first_load = True
       import netsnmp
       _NETSNMP_CACHE = netsnmp
     else:
       netsnmp = _NETSNMP_CACHE
 
+    if first_load:
+      # Loading MIBs can be very noisy, so we close stderr
+      # Ideally we would just call netsnmp_register_loghandler but that isn't
+      # exported :-(
+      stderr = os.dup(sys.stderr.fileno())
+      null = os.open(os.devnull, os.O_RDWR)
+      os.close(sys.stderr.fileno())
+      os.dup2(null, sys.stderr.fileno())
+      os.close(null)
+
     if self.version == 3:
       context = ('vlan-%s' % vlan) if vlan else ''
-      return netsnmp.Session(Version=3, DestHost=self._full_host,
+      session = netsnmp.Session(Version=3, DestHost=self._full_host,
         SecName=self.user, SecLevel=self.sec_level, Context=context,
         AuthProto=self.auth_proto, AuthPass=self.auth,
         PrivProto=self.priv_proto, PrivPass=self.priv,
         UseNumeric=1, Timeout=timeout, Retries=retries), netsnmp
     else:
       community = ('%s@%s' % (self.community, vlan)) if vlan else self.community
-      return netsnmp.Session(Version=self.version, DestHost=self._full_host,
+      session = netsnmp.Session(Version=self.version, DestHost=self._full_host,
           Community=community, UseNumeric=1, Timeout=timeout,
           Retries=retries), netsnmp
+
+    if first_load:
+      # Restore stderr
+      os.dup2(stderr, sys.stderr.fileno())
+      os.close(stderr)
+    return session
 
   def walk(self, oid, vlan=None):
     sess, netsnmp = self._snmp_session(vlan)
     ret = {}
     nextoid = oid
     offset = 0
-
-    suffix = ('@%s' % vlan) if vlan else ''
 
     # Abort the walk when it exits the OID tree we are interested in
     while nextoid.startswith(oid):
@@ -113,7 +131,7 @@ class SnmpTarget(object):
         # contained.
         if not currentoid.startswith(oid):
           break
-        ret[currentoid + suffix] = ResultTuple(result.val, result.type)
+        ret[currentoid] = ResultTuple(result.val, result.type)
       # Continue bulk walk
       offset = int(var_list[-1].iid)
       nextoid = var_list[-1].tag

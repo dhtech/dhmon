@@ -1,7 +1,9 @@
 #!/usr/bin/env python2
-import stage
+import argparse
 import sys
 import time
+
+import stage
 import actions
 
 
@@ -18,5 +20,7 @@ class Trigger(object):
 
 
 if __name__ == '__main__':
-  tag = sys.argv[1] if len(sys.argv) > 1 else '',
-  Trigger().trigger(tag)
+  parser = argparse.ArgumentParser()
+  parser.add_argument('tag', nargs='?', default='', help='tag to trigger')
+  args = parser.parse_args()
+  Trigger().trigger(args.tag)

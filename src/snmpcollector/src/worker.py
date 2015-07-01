@@ -32,7 +32,8 @@ def _poll(data):
           'OID %s does not start with .1, please verify configuration', oid)
       continue
     try:
-      results.update(target.walk(oid, vlan))
+      results.update(
+          {(k, vlan): v for k, v in target.walk(oid, vlan).iteritems()})
     except snmp.TimeoutError, e:
       timeouts += 1
       if vlan:
@@ -55,8 +56,8 @@ class Worker(object):
     self.pool = multiprocessing.Pool(processes=VLAN_MAP_POOL)
 
   def gather_oids(self, target, model):
-    if config.incarnation != self.model_oid_cache_incarnation:
-      self.model_oid_cache_incarnation = config.incarnation
+    if config.incarnation() != self.model_oid_cache_incarnation:
+      self.model_oid_cache_incarnation = config.incarnation()
       self.model_oid_cache = {}
 
     cache_key = (target.layer, model)

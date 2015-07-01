@@ -27,7 +27,7 @@ class Config(object):
       return self._config
     new_config = None
     try:
-      new_config = self.load()
+      new_config = self.load() or dict()
       if new_config == self._config:
         return self._config
     except Exception:
@@ -38,6 +38,9 @@ class Config(object):
     self.timestamp = time.time()
     self._config = new_config
     return new_config
+
+  def refresh(self):
+    self.timestamp = 0
 
 
 _config_object = Config()
@@ -52,6 +55,10 @@ def get(*path):
 
   return ret
 
-@property
+
 def incarnation():
   return _config_object.incarnation
+
+
+def refresh():
+  _config_object.refresh()
