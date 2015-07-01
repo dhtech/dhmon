@@ -62,20 +62,23 @@ class SnmpTarget(object):
     # Since pickle will import this module we do not want to drag netsnmp into
     # this on every load. Load it when we need it.
     global _NETSNMP_CACHE
+    first_load = False
     if _NETSNMP_CACHE is None:
+      first_load = True
       import netsnmp
       _NETSNMP_CACHE = netsnmp
     else:
       netsnmp = _NETSNMP_CACHE
 
-    # Loading MIBs can be very noisy, so we close stderr
-    # Ideally we would just call netsnmp_register_loghandler but that isn't
-    # exported :-(
-    stderr = os.dup(sys.stderr.fileno())
-    null = os.open(os.devnull, os.O_RDWR)
-    os.close(sys.stderr.fileno())
-    os.dup2(null, sys.stderr.fileno())
-    os.close(null)
+    if first_load:
+      # Loading MIBs can be very noisy, so we close stderr
+      # Ideally we would just call netsnmp_register_loghandler but that isn't
+      # exported :-(
+      stderr = os.dup(sys.stderr.fileno())
+      null = os.open(os.devnull, os.O_RDWR)
+      os.close(sys.stderr.fileno())
+      os.dup2(null, sys.stderr.fileno())
+      os.close(null)
 
     if self.version == 3:
       context = ('vlan-%s' % vlan) if vlan else ''
@@ -90,8 +93,10 @@ class SnmpTarget(object):
           Community=community, UseNumeric=1, Timeout=timeout,
           Retries=retries), netsnmp
 
-    # Restore stderr
-    os.dup2(stderr, sys.stderr.fileno())
+    if first_load:
+      # Restore stderr
+      os.dup2(stderr, sys.stderr.fileno())
+      os.close(stderr)
     return session
 
   def walk(self, oid, vlan=None):
