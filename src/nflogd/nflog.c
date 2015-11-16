@@ -8,6 +8,8 @@
 
 #define NFLOG_BUFFER 512
 /* TODO(bluecmd): This probably needs to be larger for v6 */
+#define NFLOG_IPV4_DATA 28
+#define NFLOG_IPV6_DATA 28
 #define NFLOG_MAX_DATA 28
 
 
@@ -36,6 +38,20 @@ static void iterator_destructor(PyObject *self) {
 }
 
 
+static void decode_ipv4(void *payload, const char **src, const char **dst,
+                        const char **proto, int *dport, int *sport, int *dscp,
+                        int *ecn, size_t *size) {
+
+  *sport = 1337;
+}
+
+
+static void decode_ipv6(void *payload, const char **src, const char **dst,
+                        const char **proto, int *dport, int *sport, int *dscp,
+                        int *ecn, size_t *size) {
+}
+
+
 static int packet_callback(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
                            struct nflog_data *nfad, void *data) {
   char *payload;
@@ -44,14 +60,37 @@ static int packet_callback(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
   struct packet_queue *new;
 
   uint32_t uid;
+  int version;
+  const char *src = NULL;
+  const char *dst = NULL;
+  const char *proto = NULL;
+  int dport = 0;
+  int sport = 0;
+  int dscp = 0;
+  int ecn = 0;
+  size_t size = 0;
+
   nflog_get_uid(nfad, &uid);
   len = nflog_get_payload(nfad, &payload);
+  version = payload[0] >> 4;
+
+  if (version == 4 && len >= NFLOG_IPV4_DATA) {
+    decode_ipv4(payload, &src, &dst, &proto, &dport, &sport, &dscp, &ecn,
+                &size);
+  } else if (version == 6 && len >= NFLOG_IPV6_DATA) {
+    decode_ipv6(payload, &src, &dst, &proto, &dport, &sport, &dscp, &ecn,
+                &size);
+  } else {
+    /* Invalid package */
+    return 0;
+  }
 
   new = malloc(sizeof(struct packet_queue));
   new->next = NULL;
 
   /* TODO(bluecmd): Decode and structure the result here */
-  new->result = Py_BuildValue("ii", len, uid);
+  new->result = Py_BuildValue("iisssiiiii", uid, version, src, dst, proto,
+                              dport, sport, dscp, ecn, size);
 
   if (object->first == NULL) {
     object->first = new;
