@@ -19,6 +19,7 @@ install:
 		$(DESTDIR)/opt/snmpcollector/snmpcollector-trigger
 	ln -sf /opt/snmpcollector/src/snmptest.py \
 		$(DESTDIR)/opt/snmpcollector/snmpcollector-test
+	mkdir -p $(DESTDIR)/etc/default $(DESTDIR)/etc/init.d
 	install -D -m600 etc/snmpcollector.yaml $(DESTDIR)/etc/
 	install -D etc/snmpcollector.default $(DESTDIR)/etc/default/snmpcollector
 	install -D snmpcollector.init $(DESTDIR)/etc/init.d/snmpcollector
