@@ -24,6 +24,7 @@ typedef struct __attribute__ ((__packed__)) {
   struct iphdr ip;
   struct icmphdr icmp;
   struct __attribute__ ((__packed__)) {
+    uint64_t user;
     uint32_t tv_sec;
     uint32_t tv_usec;
     uint32_t magic;
@@ -52,6 +53,7 @@ static PyObject *transmit(PyObject *self, PyObject *args) {
   icmp_t packet;
   struct sockaddr_in targetaddr;
   struct timeval timestamp;
+  uint64_t user;
   size_t sent;
   int sockfd;
   const char *textaddr;
@@ -69,7 +71,7 @@ static PyObject *transmit(PyObject *self, PyObject *args) {
   packet.icmp.checksum = htons(PINGER_ICMP_CHKSUM);
   packet.payload.magic = htonl(PINGER_MAGIC);
 
-  if (!PyArg_ParseTuple(args, "is", &sockfd, &textaddr)) {
+  if (!PyArg_ParseTuple(args, "isi", &sockfd, &textaddr, &user)) {
     return NULL;
   }
 
@@ -83,6 +85,7 @@ static PyObject *transmit(PyObject *self, PyObject *args) {
   if (gettimeofday(&timestamp, NULL) < 0)
     return PyErr_SetFromErrno(PyExc_OSError);
 
+  packet.payload.user = user;
   packet.payload.tv_sec = timestamp.tv_sec;
   packet.payload.tv_usec = timestamp.tv_usec;
   packet.icmp.checksum = 0;
@@ -117,6 +120,7 @@ static PyObject *receive(PyObject *self, PyObject *args) {
   }
 
   for(;;) {
+    uint64_t user;
     int secs;
     int usecs;
 
@@ -130,10 +134,12 @@ static PyObject *receive(PyObject *self, PyObject *args) {
     msg.msg_control = control;
     msg.msg_controllen = PINGER_CONTROL_SIZE;
 
+    Py_BEGIN_ALLOW_THREADS;
     res = recvmsg(sockfd, &msg, 0);
     if (res < 0) {
       return PyErr_SetFromErrno(PyExc_IOError);
     }
+    Py_END_ALLOW_THREADS;
 
     /* Check that we actually sent this packet. */
     if (res != sizeof(packet)) {
@@ -159,6 +165,7 @@ static PyObject *receive(PyObject *self, PyObject *args) {
       continue;
     }
 
+    user = packet.payload.user;
     secs = stamp->tv_sec - packet.payload.tv_sec;
     usecs = stamp->tv_usec - packet.payload.tv_usec;
     if (usecs < 0) {
@@ -169,7 +176,7 @@ static PyObject *receive(PyObject *self, PyObject *args) {
     if (inet_ntop(AF_INET, &from_addr.sin_addr, ip, sizeof(ip)) == NULL)
       return PyErr_Format(PyExc_IOError, "inet_ntop failed for IP");
 
-    return Py_BuildValue("sii", ip, secs, usecs);
+    return Py_BuildValue("siii", ip, user, secs, usecs);
   }
 }
 
