@@ -35,7 +35,7 @@ class Supervisor(object):
         continue
       layer_config = config.get('snmp', layer)
       if layer_config is None:
-        logging.error('Unable to target "%s" since layer "%s" is unknown',
+        logging.debug('Unable to target "%s" since layer "%s" is unknown',
             host, layer)
         continue
       yield host, snmp.SnmpTarget(host, ip, timestamp, layer, **layer_config)
