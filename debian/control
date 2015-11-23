@@ -21,8 +21,7 @@ Description: SNMP collector for dhmon
 
 Package: pinger
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, dhmon-common,
- python-pika (>=0.9.14), python-daemon
+Depends: ${shlibs:Depends}, ${misc:Depends}, dhmon-common
 Description: RTT collector for dhmon
  RTT collection for the DreamHack monitoring system.
 
