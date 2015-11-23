@@ -13,7 +13,7 @@ before_install:
 
 install:
   - wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo pypy
-  - rm -f setuptools-18.0.1.zip
+  - rm -f setuptools-*.zip
   - sudo pip install coveralls
   - sudo ln -sf /usr/local/bin/coverage /usr/bin/
 
