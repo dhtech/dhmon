@@ -100,9 +100,8 @@ class Worker(object):
     return overriden_results
 
   def do_snmp_walk(self, run, target):
-    ret = self._walk(target)
-    results, errors, timeouts = ret if not ret is None else ({}, 0, 1)
-
+    results, errors, timeouts = self._walk(target)
+    results = results if results else {}
     logging.debug('Done SNMP poll (%d objects) for "%s"',
         len(results.keys()), target.host)
     yield actions.Result(target, results, actions.Statistics(timeouts, errors))
@@ -110,12 +109,15 @@ class Worker(object):
   def _walk(self, target):
     try:
       model = target.model()
+    except snmp.TimeoutError, e:
+      logging.exception('Could not determine model of %s:', target.host)
+      return None, 0, 1
     except snmp.Error, e:
       logging.exception('Could not determine model of %s:', target.host)
-      return
+      return None, 1, 0
     if not model:
       logging.error('Could not determine model of %s')
-      return
+      return None, 1, 0
 
     logging.debug('Object %s is model %s', target.host, model)
     global_oids, vlan_oids = self.gather_oids(target, model)
