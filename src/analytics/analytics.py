@@ -82,12 +82,18 @@ def snmp_errors():
 
 @app.route('/syslog.status')
 def syslog_status():
-  return "{}"
+  result = json.loads(prometheus('max_over_time(syslog_log_bytes[5m])'))
+  ts = result['data']['result']
+  nodes = {x['metric']['host']: {'size': int(x['value'][1])} for x in ts}
+  return json.dumps(nodes)
 
 
 @app.route('/rancid.status')
 def rancid_status():
-  return "{}"
+  result = json.loads(prometheus('max_over_time(rancid_config_bytes[5m])'))
+  ts = result['data']['result']
+  nodes = {x['metric']['host']: {'size': int(x['value'][1])} for x in ts}
+  return json.dumps(nodes)
 
 
 @app.route('/dhcp.status')
