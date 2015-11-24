@@ -1,3 +1,4 @@
+import collections
 import flask
 import json
 import sqlite3
@@ -90,24 +91,54 @@ def switch_version():
   return "{}"
 
 
+def interface_variable(variable, key, nodes):
+  result = json.loads(prometheus(variable))
+  ts = result['data']['result']
+  for data in ts:
+    host = data['metric']['device']
+    iface = data['metric']['interface']
+    if 'enum' in data['metric']:
+      value = data['metric']['enum']
+    else:
+      value = data['value'][1]
+    nodes[host][iface][key] = value
+    nodes[host][iface]['lastoid'] = data['metric']['index']
+
+
 @app.route('/switch.interfaces')
 def switch_interfaces():
-  return "{}"
+  nodes = collections.defaultdict(lambda: collections.defaultdict(dict))
+  interface_variable('ifOperStatus', 'status', nodes)
+  interface_variable('vlanTrunkPortDynamicStatus', 'trunk', nodes)
+  interface_variable('ifOutErrors', 'errors_out', nodes)
+  interface_variable('ifInErrors', 'errors_in', nodes)
+  interface_variable('ifAdminStatus', 'admin', nodes)
+  interface_variable('ifHighSpeed', 'speed', nodes)
+  interface_variable('dot1dStpPortState', 'stp', nodes)
+  return json.dumps(nodes)
 
 
 @app.route('/switch.vlans')
 def switch_vlans():
-  return "{}"
+  result = json.loads(prometheus('changes(vtpVlanState[5m])'))
+  ts = result['data']['result']
+
+  nodes = collections.defaultdict(dict)
+  for data in ts:
+    host = data['metric']['device']
+    vlan = data['metric']['index'].split('.', 1)[1]
+    nodes[host][vlan] = 1
+  return json.dumps(nodes)
 
 
 @app.route('/switch.model')
 def switch_model():
-  return "{}"
+  result = json.loads(prometheus(
+    'changes(entPhysicalModelName{index="1"}[5m])'))
+  ts = result['data']['result']
 
-
-@app.route('/switch.status')
-def switch_status():
-  return "{}"
+  nodes = {x['metric']['device']: {'model': x['metric']['value']} for x in ts}
+  return json.dumps(nodes)
 
 
 if __name__ == '__main__':
