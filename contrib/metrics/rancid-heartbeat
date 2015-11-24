@@ -13,5 +13,5 @@ do
   SIZE=$(wc -c $host | awk '{print $1}')
 
   echo "rancid_config_bytes{host="$host"} $SIZE $(($TIMESTAMP * 1000))"
-  echo "rancid_config_updated{host="$host"} $SIZE $(($TIMESTAMP * 1000)"
+  echo "rancid_config_updated{host="$host"} $SIZE $(($TIMESTAMP * 1000))"
 done
