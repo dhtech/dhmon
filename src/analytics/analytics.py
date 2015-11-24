@@ -8,17 +8,26 @@ import urllib2
 
 
 DB_FILE = '/etc/ipplan.db'
+CACHE_TIME = 10
 
 app = flask.Flask(__name__)
+prometheus_cache = {}
 
 
 def prometheus(query):
+  if query in prometheus_cache:
+    result, expire = prometheus_cache[query]
+    if expire < time.time():
+      return result
   host = 'http://localhost:9090'
   url = '{host}/prometheus/api/v1/query?query={query}&time={time}'
 
   o = urllib2.urlopen(url.format(
     query=urllib.quote(query), time=int(time.time()), host=host))
-  return o.read()
+
+  res = o.read()
+  prometheus_cache[query] = (res, time.time() + CACHE_TIME)
+  return res
 
 
 @app.route('/event.hosts')
@@ -83,7 +92,24 @@ def rancid_status():
 
 @app.route('/dhcp.status')
 def dhcp_status():
-  return "{}"
+  result = json.loads(prometheus('dhcp_leases_current_count'))
+  dhcp_usage = result['data']['result']
+  result = json.loads(prometheus('dhcp_leases_max_count'))
+  dhcp_max = {
+      x['metric']['network']: x['value'][1]
+      for x in result['data']['result']}
+
+  networks = {}
+  for data in dhcp_usage:
+    domain, network = data['metric']['network'].split('@', 2)
+    vlan = data['metric']['vlan']
+    networks[network] = {
+        'domain': domain,
+        'vlan': vlan,
+        'usage': data['value'][1],
+        'max': dhcp_max[data['metric']['network']]
+    }
+  return json.dumps(networks)
 
 
 @app.route('/switch.version')
@@ -92,7 +118,7 @@ def switch_version():
 
 
 def interface_variable(variable, key, nodes):
-  result = json.loads(prometheus(variable))
+  result = json.loads(prometheus(variable + '{layer="access"}'))
   ts = result['data']['result']
   for data in ts:
     host = data['metric']['device']
@@ -142,5 +168,5 @@ def switch_model():
 
 
 if __name__ == '__main__':
-  app.run(debug=True)
+  app.run(debug=True, threaded=True)
 
