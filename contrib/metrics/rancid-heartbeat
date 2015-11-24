@@ -3,7 +3,6 @@
 cd /var/lib/rancid/*/configs
 
 TIMESTAMP=$(date +'%s')
-echo "TIMESTAMP=$TIMESTAMP"
 
 for host in $(sqlite3 /etc/ipplan.db "SELECT h.name FROM host h, option o WHERE o.name = 'rncd' AND h.node_id = o.node_id")
 do
@@ -13,6 +12,6 @@ do
     | xargs -I{} date --date={} +'%s')
   SIZE=$(wc -c $host | awk '{print $1}')
 
-  echo "rancid_config_bytes{host='$host'} $SIZE $(($TIMESTAMP * 1000))"
-  echo "rancid_config_updated{host='$host'} $SIZE $(($TIMESTAMP * 1000)"
+  echo "rancid_config_bytes{host="$host"} $SIZE $(($TIMESTAMP * 1000))"
+  echo "rancid_config_updated{host="$host"} $SIZE $(($TIMESTAMP * 1000)"
 done
