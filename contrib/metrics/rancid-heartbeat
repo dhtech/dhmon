@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd /var/lib/rancid/dreamhack/configs
+cd /var/lib/rancid/*/configs
 
 TIMESTAMP=$(date +'%s')
 echo "TIMESTAMP=$TIMESTAMP"
@@ -13,6 +13,6 @@ do
     | xargs -I{} date --date={} +'%s')
   SIZE=$(wc -c $host | awk '{print $1}')
 
-  echo "$host|rancid.updated|$(($TIMESTAMP - $MARKER)) * 1000"
-  echo "$host|rancid.size|$SIZE"
+  echo "rancid_config_bytes{host='$host'} $SIZE $(($TIMESTAMP * 1000))"
+  echo "rancid_config_updated{host='$host'} $SIZE $(($TIMESTAMP * 1000)"
 done
