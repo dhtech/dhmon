@@ -127,16 +127,20 @@ def interface_variable(variable, key, nodes, bool_value=None):
   result = json.loads(prometheus(variable + '{layer="access"}'))
   ts = result['data']['result']
   for data in ts:
-    host = data['metric']['device']
-    iface = data['metric']['interface']
-    if 'enum' in data['metric']:
-      value = data['metric']['enum']
-    else:
-      value = data['value'][1]
-    if bool_value is not None:
-      value = (bool_value == value)
-    nodes[host][iface][key] = value
-    nodes[host][iface]['lastoid'] = data['metric']['index']
+    try:
+      host = data['metric']['device']
+      iface = data['metric']['interface']
+      if 'enum' in data['metric']:
+        value = data['metric']['enum']
+      else:
+        value = data['value'][1]
+      if bool_value is not None:
+        value = (bool_value == value)
+      nodes[host][iface][key] = value
+      nodes[host][iface]['lastoid'] = data['metric']['index']
+    except KeyError:
+      # Ignore incomplete data
+      continue
 
 
 @app.route('/switch.interfaces')
