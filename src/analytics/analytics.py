@@ -17,7 +17,7 @@ prometheus_cache = {}
 def prometheus(query):
   if query in prometheus_cache:
     result, expire = prometheus_cache[query]
-    if expire < time.time():
+    if expire > time.time():
       return result
   host = 'http://localhost:9090'
   url = '{host}/prometheus/api/v1/query?query={query}&time={time}'
