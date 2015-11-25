@@ -73,7 +73,7 @@ class Exporter(object):
     COMPLETED_POLL_COUNT.labels(target.host).inc(1)
     ERROR_COUNT.labels(target.host).inc(stats.errors)
     TIMEOUT_COUNT.labels(target.host).inc(stats.timeouts)
-    if stats.error == 0 and stats.timeouts == 0:
+    if stats.errors == 0 and stats.timeouts == 0:
       SUCCESSFUL_POLL_COUNT.labels(target.host).inc(1)
     DEVICE_LATENCY.labels(target.host).observe(latency)
 
