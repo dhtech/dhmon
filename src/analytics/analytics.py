@@ -123,7 +123,7 @@ def switch_version():
   return "{}"
 
 
-def interface_variable(variable, key, nodes):
+def interface_variable(variable, key, nodes, bool_value=None):
   result = json.loads(prometheus(variable + '{layer="access"}'))
   ts = result['data']['result']
   for data in ts:
@@ -133,6 +133,8 @@ def interface_variable(variable, key, nodes):
       value = data['metric']['enum']
     else:
       value = data['value'][1]
+    if bool_value is not None:
+      value = (bool_value == value)
     nodes[host][iface][key] = value
     nodes[host][iface]['lastoid'] = data['metric']['index']
 
@@ -141,7 +143,7 @@ def interface_variable(variable, key, nodes):
 def switch_interfaces():
   nodes = collections.defaultdict(lambda: collections.defaultdict(dict))
   interface_variable('ifOperStatus', 'status', nodes)
-  interface_variable('vlanTrunkPortDynamicStatus', 'trunk', nodes)
+  interface_variable('vlanTrunkPortDynamicStatus', 'trunk', nodes, 'trunking')
   interface_variable('ifOutErrors', 'errors_out', nodes)
   interface_variable('ifInErrors', 'errors_in', nodes)
   interface_variable('ifAdminStatus', 'admin', nodes)
