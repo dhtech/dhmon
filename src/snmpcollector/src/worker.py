@@ -11,7 +11,7 @@ import stage
 
 
 # How many sub-workers to spawn to enumerate VLAN OIDs
-VLAN_MAP_POOL = 5
+VLAN_MAP_POOL = 2
 
 
 def _poll(data):
