@@ -39,8 +39,15 @@ class Annotator(object):
     annotation_map = {}
     for annotation in annotations:
       for annotate in annotation['annotate']:
+        # Support for processing the index (for OIDs that have X.Y where we're
+        # interested in joining on X)
+        if '[' in annotate:
+          annotate, offset = annotate.split('[', 1)
+          offset = int(offset.strip(']'))
+        else:
+          offset = None
         # Add '.' to not match .1.2.3 if we want to annotate 1.2.30
-        annotation_map[annotate + '.'] = annotation['with']
+        annotation_map[(annotate + '.', offset)] = annotation['with']
 
     labelification = set(
         [x + '.' for x in config.get('annotator', 'labelify') or []])
@@ -124,15 +131,17 @@ class Annotator(object):
         len(annotated_results), target.host)
 
   def annotate(self, oid, index, ctxt, annotation_map, split_oid_map, results):
-    for key in annotation_map:
+    for key, offset in annotation_map:
       if oid.startswith(key):
         break
     else:
       return {}
 
-    saved_index = index
+    if offset is not None:
+      index_parts = index.split('.')
+      index = index_parts[len(index_parts) - offset - 1]
     labels = {}
-    for label, annotation_path in annotation_map[key].iteritems():
+    for label, annotation_path in annotation_map[(key, offset)].iteritems():
       # Parse the annotation path
       annotation_keys = [x.strip() + '.' for x in annotation_path.split('>')]
 

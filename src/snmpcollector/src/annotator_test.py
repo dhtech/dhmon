@@ -151,6 +151,36 @@ annotator:
       {'interface': 'interface1', 'alias': 'alias1'}))
     self.runTest(expected, result, config)
 
+  def testSimpleAnnotationDeepLevel(self):
+    """Test simple annotation and VLAN support."""
+    config = """
+annotator:
+  annotations:
+    - annotate:
+        - .1.2[1]
+      with:
+        interface: .10.1
+        alias: .10.2
+"""
+    result = self.createResult({
+      ('.1.2.3.1.666', None): snmpResult(1337),
+      ('.1.2.3.3.666', None): snmpResult(1338),
+      ('.1.2.4.1.666', None): snmpResult(1339),
+      ('.1.2.4.1.666', '100'): snmpResult(1339),
+      ('.10.1.1', None): snmpResult('interface1'),
+      ('.10.1.3.2', None): snmpResult('interface2'),
+      ('.10.2.1', None): snmpResult('alias1'),
+      ('.10.2.3.2', None): snmpResult('alias2'),
+    })
+    expected = self.newExpectedFromResult(result)
+    expected.update(self.createResultEntry(('.1.2.3.1.666', None), result,
+      {'interface': 'interface1', 'alias': 'alias1'}))
+    expected.update(self.createResultEntry(('.1.2.4.1.666', None), result,
+      {'interface': 'interface1', 'alias': 'alias1'}))
+    expected.update(self.createResultEntry(('.1.2.4.1.666', '100'), result,
+      {'interface': 'interface1', 'alias': 'alias1'}))
+    self.runTest(expected, result, config)
+
   def testMultiLevelAnnotation(self):
     """Test multi level annotation."""
     config = """
