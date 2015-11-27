@@ -164,10 +164,6 @@ class SnmpTarget(object):
       value = model.values().pop().value
       if value:
         return value
-    # ASR doesn't really like telling us what it is, so we have to walk it
-    for oid, res in self.walk('.1.3.6.1.2.1.47.1.1.1.1.13').iteritems():
-      if res.value.startswith('A9K-RSP'):
-        return res.value
     raise NoModelOid('No model OID contained a model')
 
   def vlans(self):
