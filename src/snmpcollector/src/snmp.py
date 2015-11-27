@@ -155,6 +155,7 @@ class SnmpTarget(object):
         '.1.3.6.1.2.1.47.1.1.1.1.13.1',     # Normal switches
         '.1.3.6.1.2.1.47.1.1.1.1.13.1001',  # Stacked switches
         '.1.3.6.1.2.1.47.1.1.1.1.13.10',    # Nexus
+        '.1.3.6.1.2.1.1.1.0',               # Other appliances (sysDescr)
     ]
     for oid in model_oids:
       model = self.get(oid)
