@@ -139,7 +139,7 @@ class Annotator(object):
 
     if offset is not None:
       index_parts = index.split('.')
-      index = index_parts[len(index_parts) - offset - 1]
+      index = '.'.join(index_parts[:-offset])
     labels = {}
     for label, annotation_path in annotation_map[(key, offset)].iteritems():
       # Parse the annotation path
