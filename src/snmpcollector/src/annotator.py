@@ -189,7 +189,7 @@ class Annotator(object):
       if not index:
         return None
 
-    value = index
+    value = results[(oid, ctxt)].value
 
     # Try enum resolution
     _, enum = self.mibcache[oid]
