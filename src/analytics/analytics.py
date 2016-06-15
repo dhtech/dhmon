@@ -12,6 +12,8 @@ CACHE_TIME = 10
 
 app = flask.Flask(__name__)
 prometheus_cache = {}
+host_cache = ''
+host_cache_expire = 0
 
 
 def prometheus(query):
@@ -32,6 +34,10 @@ def prometheus(query):
 
 @app.route('/event.hosts')
 def event_hosts():
+  global host_cache_expire
+  global host_cache
+  if host_cache_expire > time.time():
+    return host_cache
   conn = sqlite3.connect(DB_FILE)
   c = conn.cursor()
   c.execute('SELECT h.node_id, h.name, n.name '
@@ -48,7 +54,9 @@ def event_hosts():
     nodes[node] = {
       'options': options
     }
-  return json.dumps(nodes)
+  host_cache = json.dumps(nodes)
+  host_cache_expire = time.time() + CACHE_TIME
+  return host_cache
 
 
 @app.route('/ping.status')
