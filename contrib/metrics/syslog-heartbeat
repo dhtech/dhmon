@@ -15,6 +15,6 @@ do
   else
     host="$filename"
   fi
-  echo "syslog_log_bytes{host='$host'} ${size}   $(($now * 1000))"
-  echo "syslog_log_updated{host='$host'} ${stamp} $(($now * 1000))"
+  echo "syslog_log_bytes{host=\"$host\"} ${size}   $(($now * 1000))"
+  echo "syslog_log_updated{host=\"$host\"} ${stamp} $(($now * 1000))"
 done
