@@ -7,12 +7,6 @@ wget http://ftp.debian.org/debian/pool/non-free/s/snmp-mibs-downloader/snmp-mibs
 dpkg -i snmp-mibs-downloader_1.1_all.deb || apt-get -f install -y
 rm -f snmp-mibs-downloader_1.1_all.deb
 
-# Enable MIBS
-cat << _EOF_ > /etc/snmp/snmp.conf
-mibs ALL
-mibdirs /var/lib/mibs/ietf:/var/lib/mibs/iana:/var/lib/mibs/netsnmp:/var/lib/mibs/cisco
-_EOF_
-
 cat << _EOF_ > /etc/snmp-mibs-downloader/snmp-mibs-downloader.conf
 # Master configuarion for mib-downloader
 #
