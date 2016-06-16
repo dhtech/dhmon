@@ -142,7 +142,9 @@ class Exporter(object):
           labels['device'] = host
           labels['layer'] = layer
           labels['index'] = index
-          labels['type'] = type
+          # For now, remove type from labels as it makes it hard to join metrics
+          # without any real benefit.
+          # labels['type'] = type
 
           label_list = ['{0}="{1}"'.format(k, v) for k, v in labels.iteritems()]
           label_string = ','.join(label_list)
