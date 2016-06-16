@@ -128,15 +128,18 @@ annotator:
       with:
         interface: .10.1
         alias: .10.2
+        nonexistant: .10.3
 """
     result = self.createResult({
       ('.1.2.3.1', None): snmpResult(1337),
       ('.1.2.3.3', None): snmpResult(1338),
       ('.1.2.4.1', None): snmpResult(1339),
       ('.1.2.4.3.2', None): snmpResult(1340),
+      ('.1.2.4.3.3', None): snmpResult(1341),
       ('.1.2.4.1', '100'): snmpResult(1339),
       ('.10.1.1', None): snmpResult('interface1'),
       ('.10.1.3.2', None): snmpResult('interface2'),
+      ('.10.1.3.3', None): snmpResult('interface3'),
       ('.10.2.1', None): snmpResult('alias1'),
       ('.10.2.3.2', None): snmpResult('alias2'),
     })
@@ -149,6 +152,8 @@ annotator:
       {'interface': 'interface2', 'alias': 'alias2'}))
     expected.update(self.createResultEntry(('.1.2.4.1', '100'), result,
       {'interface': 'interface1', 'alias': 'alias1'}))
+    expected.update(self.createResultEntry(('.1.2.4.3.3', None), result,
+      {'interface': 'interface3'}))
     self.runTest(expected, result, config)
 
   def testSimpleAnnotationDeepLevel(self):

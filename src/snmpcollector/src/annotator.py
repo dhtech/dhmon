@@ -177,7 +177,7 @@ class Annotator(object):
         # a usecase in the future.
         ctxt = None
         if not part:
-          continue
+          return None
 
       # We either use the last index or the OID value, deterimed by
       # use_value above.
