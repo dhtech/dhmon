@@ -120,6 +120,14 @@ class Exporter(object):
       target.host, target.layer, result.index, result.data.type)] = (
           result.data.value, target.timestamp, result.labels)
 
+  def is_only_numeric(self, labels_map):
+    for (value, _, _) in labels_map.itervalues():
+      try:
+        float(value)
+      except ValueError:
+        return False
+    return True
+
   def run_dump(self):
     while True:
       # Since the label map will be mutated we need to do a deep copy here.
@@ -131,6 +139,13 @@ class Exporter(object):
       # Assemble the output
       out = []
       for obj, (mib, metrics_type, labels_map) in metrics_copy.iteritems():
+        # Some vendors (e.g. Fortigate) choose to have decimal values as
+        # OCTETSTR instead of a scaled value. Try to convert all values, if
+        # we succeed export this metric as guage.
+        convert_to_float = False
+        if metrics_type == 'blob' and self.is_only_numeric(labels_map):
+          metrics_type = 'gauge'
+          convert_to_float = True
         if metrics_type != 'counter' and metrics_type != 'gauge':
           continue
         out.append('# HELP {0} {1}::{0}\n'.format(obj, mib))
@@ -149,6 +164,9 @@ class Exporter(object):
           label_list = ['{0}="{1}"'.format(k, v) for k, v in labels.iteritems()]
           label_string = ','.join(label_list)
           instance = ''.join([obj, '{', label_string, '}'])
+
+          if convert_to_float:
+            value = float(value)
 
           out.append('{0} {1} {2}\n'.format(
             instance, value, int(timestamp * 1000)))
