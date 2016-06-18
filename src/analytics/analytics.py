@@ -1,7 +1,10 @@
 import collections
+import concurrent.futures
 import flask
+import functools
 import json
 import sqlite3
+import threading
 import time
 import urllib
 import urllib2
@@ -10,34 +13,40 @@ import urllib2
 DB_FILE = '/etc/ipplan.db'
 CACHE_TIME = 10
 
+
+class DataSource(object):
+  def __init__(self, data, func):
+    self.data = data
+    self.func = func
+
+
 app = flask.Flask(__name__)
-prometheus_cache = {}
-host_cache = ''
-host_cache_expire = 0
+data_sources = {}
+
+
+def analytics(t):
+  def handler(func):
+    data_sources[t] = DataSource("", func)
+    @app.route(t)
+    @functools.wraps(func)
+    def wrapper():
+      return data_sources[t].data
+    return wrapper
+  return handler
 
 
 def prometheus(query):
-  if query in prometheus_cache:
-    result, expire = prometheus_cache[query]
-    if expire > time.time():
-      return result
   host = 'http://localhost:9090'
   url = '{host}/prometheus/api/v1/query?query={query}&time={time}'
 
   o = urllib2.urlopen(url.format(
     query=urllib.quote(query), time=int(time.time()), host=host))
 
-  res = o.read()
-  prometheus_cache[query] = (res, time.time() + CACHE_TIME)
-  return res
+  return o.read()
 
 
-@app.route('/event.hosts')
+@analytics('/event.hosts')
 def event_hosts():
-  global host_cache_expire
-  global host_cache
-  if host_cache_expire > time.time():
-    return host_cache
   conn = sqlite3.connect(DB_FILE)
   c = conn.cursor()
   c.execute('SELECT h.node_id, h.name, n.name '
@@ -54,12 +63,10 @@ def event_hosts():
     nodes[node] = {
       'options': options
     }
-  host_cache = json.dumps(nodes)
-  host_cache_expire = time.time() + CACHE_TIME
-  return host_cache
+  return json.dumps(nodes)
 
 
-@app.route('/ping.status')
+@analytics('/ping.status')
 def ping_status():
   result = json.loads(prometheus('changes(icmp_rtt_seconds_sum[1m])'))
   ts = result['data']['result']
@@ -68,7 +75,7 @@ def ping_status():
   return json.dumps(nodes)
 
 
-@app.route('/snmp.saves')
+@analytics('/snmp.saves')
 def snmp_saves():
   result = json.loads(prometheus('max_over_time(snmp_oid_count[5m])'))
   ts = result['data']['result']
@@ -77,7 +84,7 @@ def snmp_saves():
   return json.dumps(nodes)
 
 
-@app.route('/snmp.errors')
+@analytics('/snmp.errors')
 def snmp_errors():
   result = json.loads(prometheus(
     'increase(snmp_error_count[5m]) + increase(snmp_timeout_count[5m]) > 0'))
@@ -88,7 +95,7 @@ def snmp_errors():
   return json.dumps(nodes)
 
 
-@app.route('/syslog.status')
+@analytics('/syslog.status')
 def syslog_status():
   result = json.loads(prometheus('max_over_time(syslog_log_bytes[5m])'))
   ts = result['data']['result']
@@ -96,7 +103,7 @@ def syslog_status():
   return json.dumps(nodes)
 
 
-@app.route('/rancid.status')
+@analytics('/rancid.status')
 def rancid_status():
   result = json.loads(prometheus('max_over_time(rancid_config_bytes[5m])'))
   ts = result['data']['result']
@@ -104,7 +111,7 @@ def rancid_status():
   return json.dumps(nodes)
 
 
-@app.route('/dhcp.status')
+@analytics('/dhcp.status')
 def dhcp_status():
   result = json.loads(prometheus('dhcp_leases_current_count'))
   dhcp_usage = result['data']['result']
@@ -126,14 +133,15 @@ def dhcp_status():
   return json.dumps(networks)
 
 
-@app.route('/switch.version')
+@analytics('/switch.version')
 def switch_version():
   return "{}"
 
 
-def interface_variable(variable, key, nodes, bool_value=None):
+def interface_variable(variable, key, bool_value=None):
   result = json.loads(prometheus(variable + '{layer="access"}'))
   ts = result['data']['result']
+  nodes = collections.defaultdict(lambda: collections.defaultdict(dict))
   for data in ts:
     try:
       host = data['metric']['device']
@@ -149,22 +157,34 @@ def interface_variable(variable, key, nodes, bool_value=None):
     except KeyError:
       # Ignore incomplete data
       continue
+  return dict(nodes)
 
 
-@app.route('/switch.interfaces')
+@analytics('/switch.interfaces')
 def switch_interfaces():
   nodes = collections.defaultdict(lambda: collections.defaultdict(dict))
-  interface_variable('ifOperStatus', 'status', nodes)
-  interface_variable('vlanTrunkPortDynamicStatus', 'trunk', nodes, 'trunking')
-  interface_variable('ifOutErrors', 'errors_out', nodes)
-  interface_variable('ifInErrors', 'errors_in', nodes)
-  interface_variable('ifAdminStatus', 'admin', nodes)
-  interface_variable('ifHighSpeed', 'speed', nodes)
-  interface_variable('dot1dStpPortState', 'stp', nodes)
+  variables = (
+    ('ifOperStatus', 'status'),
+    ('vlanTrunkPortDynamicStatus', 'trunk', 'trunking'),
+    ('ifOutErrors', 'errors_out'),
+    ('ifInErrors', 'errors_in'),
+    ('ifAdminStatus', 'admin'),
+    ('ifHighSpeed', 'speed'),
+    ('dot1dStpPortState', 'stp'))
+
+  results = []
+  with concurrent.futures.ThreadPoolExecutor(max_workers=10) as e:
+    for variables in e.map(lambda x: interface_variable(*x), variables):
+      results.append(variables)
+
+  for result in results:
+    for node, ifaces in result.iteritems():
+      for iface, props in ifaces.iteritems():
+        nodes[node][iface].update(props)
   return json.dumps(nodes)
 
 
-@app.route('/switch.vlans')
+@analytics('/switch.vlans')
 def switch_vlans():
   result = json.loads(prometheus('changes(vtpVlanState[5m])'))
   ts = result['data']['result']
@@ -177,7 +197,7 @@ def switch_vlans():
   return json.dumps(nodes)
 
 
-@app.route('/switch.model')
+@analytics('/switch.model')
 def switch_model():
   result = json.loads(prometheus(
     'changes(entPhysicalModelName{index="1"}[5m])'))
@@ -187,6 +207,19 @@ def switch_model():
   return json.dumps(nodes)
 
 
+def fetch(sources):
+  while True:
+    for source in sources:
+      sources[source].data = sources[source].func()
+    time.sleep(CACHE_TIME)
+
+
 if __name__ == '__main__':
-  app.run(debug=True, threaded=True)
+  fetch_thread = threading.Thread(target=fetch,args=(data_sources,))
+  fetch_thread.daemon = True
+  fetch_thread.start()
+  # The background thread will be multiplied with the number of flask
+  # threads, so keep just one thread for serving. The data is cached anyway
+  # so it should be fast.
+  app.run(debug=True, threaded=False, port=5000)
 
