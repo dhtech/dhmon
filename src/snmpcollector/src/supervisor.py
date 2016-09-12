@@ -38,9 +38,9 @@ class Supervisor(object):
         
   def fetch_nodes(self, domain):
     if config.get('static'):
-      return fetch_nodes_static(config.get('static'), domain)
+      return self.fetch_nodes_static(config.get('static'), domain)
     elif config.get('ipplan'):
-      return fetch_nodes_ipplan(config.get('ipplan'), domain)
+      return self.fetch_nodes_ipplan(config.get('ipplan'), domain)
     raise Exception('No target source defined')
 
   def construct_targets(self, timestamp):
