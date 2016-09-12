@@ -34,7 +34,6 @@ class TestSuportvisor(unittest.TestCase):
     mock_config.return_value = yaml.load(CONFIG)
     mock_fetch_nodes.return_value = [
         ('test1', '1.2.3.4', 'access'),
-        ('testb', '1.2.3.4', 'access'),
         ('test2', '1.2.3.5', 'access')]
     expected_debug = {}
 
