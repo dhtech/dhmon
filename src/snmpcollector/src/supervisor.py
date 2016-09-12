@@ -2,6 +2,7 @@
 import logging
 import sqlite3
 import time
+import yaml
 
 import actions
 import config
@@ -17,22 +18,35 @@ class Supervisor(object):
   message to the workers.
   """
 
-  def fetch_nodes(self):
-    db = sqlite3.connect(config.get('ipplan'))
+  def fetch_nodes_ipplan(self, ipplan, domain):
+    db = sqlite3.connect(ipplan)
     cursor = db.cursor()
     sql = ('SELECT h.name, h.ipv4_addr_txt, o.value, n.name '
         'FROM host h, option o, network n '
         'WHERE o.name = "layer" AND h.node_id = o.node_id '
         'AND h.network_id = n.node_id')
     # TODO(bluecmd): We should probably use an iterator here instead
-    return cursor.execute(sql).fetchall()
+    for host, ip, layer, network in cursor.execute(sql).fetchall():
+      if network.split('@', 1)[0].lower() != domain:
+        continue
+      yield host, ip, layer
+
+  def fetch_nodes_static(self, static, domain):
+    with file(static) as f:
+      for row in yaml.safe_load(f.read())[domain]:
+        yield row['host'], row['ip'], row['layer']
+        
+  def fetch_nodes(self, domain):
+    if config.get('static'):
+      return fetch_nodes_static(config.get('static'), domain)
+    elif config.get('ipplan'):
+      return fetch_nodes_ipplan(config.get('ipplan'), domain)
+    raise Exception('No target source defined')
 
   def construct_targets(self, timestamp):
     nodes = {}
     domain = config.get('domain').lower()
-    for host, ip, layer, network in self.fetch_nodes():
-      if network.split('@', 1)[0].lower() != domain:
-        continue
+    for host, ip, layer in self.fetch_nodes(domain):
       layer_config = config.get('snmp', layer)
       if layer_config is None:
         logging.debug('Unable to target "%s" since layer "%s" is unknown',
