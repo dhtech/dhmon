@@ -64,7 +64,7 @@ def main(port, interval):
   # TODO(bluecmd): Make this an iterator
   while True:
     ip, timestamp, secs, usecs = dhmonpinger.receive(sockfd)
-    icmp_rtt.labels({'host': hosts[ip]}).observe(
+    icmp_rtt.labels(hosts[ip]).observe(
         float(secs*1000000 + usecs)/10**6)
 
 if __name__ == '__main__':
