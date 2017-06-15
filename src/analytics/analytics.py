@@ -77,20 +77,20 @@ def ping_status():
 
 @analytics('/snmp.saves')
 def snmp_saves():
-  result = json.loads(prometheus('max_over_time(snmp_oid_count[5m])'))
+  result = json.loads(prometheus('sum(count_over_time({__name__=~".+"}[5m])) by (instance)'))
   ts = result['data']['result']
 
-  nodes = {x['metric']['device']: {'metrics': int(x['value'][1])} for x in ts}
+  nodes = {x['metric']['instance']: {'metrics': int(x['value'][1])} for x in ts}
   return json.dumps(nodes)
 
 
 @analytics('/snmp.errors')
 def snmp_errors():
   result = json.loads(prometheus(
-    'increase(snmp_error_count[5m]) + increase(snmp_timeout_count[5m]) > 0'))
+    'count(min_over_time(up{job=~"snmp.*"}[5m]) == 0) by (instance)'))
   ts = result['data']['result']
 
-  nodes = {x['metric']['device']: {
+  nodes = {x['metric']['instance']: {
     'error': 'Timeout or Auth Error'} for x in ts}
   return json.dumps(nodes)
 
@@ -147,7 +147,7 @@ def interface_variable(variable, key, bool_value=None, func=None, time=''):
   nodes = collections.defaultdict(lambda: collections.defaultdict(dict))
   for data in ts:
     try:
-      host = data['metric']['device']
+      host = data['metric']['instance']
       iface = data['metric']['interface']
       if 'enum' in data['metric']:
         value = data['metric']['enum']
@@ -194,7 +194,7 @@ def switch_vlans():
 
   nodes = collections.defaultdict(dict)
   for data in ts:
-    host = data['metric']['device']
+    host = data['metric']['instance']
     vlan = data['metric']['index'].split('.', 1)[1]
     nodes[host][vlan] = 1
   return json.dumps(nodes)
@@ -206,7 +206,7 @@ def switch_model():
     'changes(entPhysicalModelName{device!="",index="1"}[5m])'))
   ts = result['data']['result']
 
-  nodes = {x['metric']['device']: {'model': x['metric']['value']} for x in ts}
+  nodes = {x['metric']['instance']: {'model': x['metric']['value']} for x in ts}
   return json.dumps(nodes)
 
 
