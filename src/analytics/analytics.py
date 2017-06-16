@@ -87,7 +87,7 @@ def snmp_saves():
 @analytics('/snmp.errors')
 def snmp_errors():
   result = json.loads(prometheus(
-    'count(min_over_time(up{job=~"snmp.*"}[5m]) == 0) by (instance)'))
+    'count(max_over_time(up{job=~"snmp.*"}[5m]) == 0) by (instance)'))
   ts = result['data']['result']
 
   nodes = {x['metric']['instance']: {
