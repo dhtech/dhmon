@@ -1,6 +1,0 @@
-#@ IPV4-EVENT-NET	10.0.0.0/16
-#@ IPV6-EVENT-NET	2001::/48
-
-ACCESS-MGMT-C-SOUTH-ST					D-R	10.0.0.0/24		100	othernet
-#$ c01-a.event.dreamhack.local					10.0.0.1			ipv4f;ipv4r;layer=access
-
