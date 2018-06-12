@@ -7,7 +7,7 @@ before_install:
   - echo "deb http://archive.ubuntu.com/ubuntu trusty main universe" | sudo tee -a /etc/apt/sources.list
   - sudo apt-get update -qq
   - >
-    sudo apt-get install -qq --install-recommends
+    sudo apt-get install -qq --install-recommends debhelper debmake
     git-buildpackage pypy devscripts build-essential python-dev
     libsnmp-dev python-pika python-yaml python-mock
 
