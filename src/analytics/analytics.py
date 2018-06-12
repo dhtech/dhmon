@@ -75,6 +75,18 @@ def ping_status():
   return json.dumps(nodes)
 
 
+@analytics('/mon.alerts')
+def mon_alerts():
+  result = json.loads(prometheus(
+      'count(' +
+      'label_replace(ALERTS{host!=""}, "instance", "$1", "host", "(.*)") ' +
+      'or label_replace(ALERTS{instance!=""}, "instance", "$1", "instance", "(.*):[0-9]+")) ' +
+      'by (instance)'))
+  ts = result['data']['result']
+  nodes = {x['metric']['instance']: int(x['value'][1]) for x in ts}
+  return json.dumps(nodes)
+
+
 @analytics('/snmp.saves')
 def snmp_saves():
   result = json.loads(prometheus('sum(count_over_time({__name__=~".+",instance!=""}[5m])) by (instance)'))
