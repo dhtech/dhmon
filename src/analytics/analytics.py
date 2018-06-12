@@ -151,7 +151,7 @@ def switch_version():
 
 
 def interface_variable(variable, key, bool_value=None, func=None, time=''):
-  query = variable + '{device!="",layer="access"}' + time
+  query = variable + '{instance!="",layer="access"}' + time
   if func:
     query = '%s(%s)' % (func, query)
   result = json.loads(prometheus(query))
@@ -201,7 +201,7 @@ def switch_interfaces():
 
 @analytics('/switch.vlans')
 def switch_vlans():
-  result = json.loads(prometheus('changes(vtpVlanState{device!=""}[5m])'))
+  result = json.loads(prometheus('changes(vtpVlanState{instance!=""}[5m])'))
   ts = result['data']['result']
 
   nodes = collections.defaultdict(dict)
@@ -215,7 +215,7 @@ def switch_vlans():
 @analytics('/switch.model')
 def switch_model():
   result = json.loads(prometheus(
-    'changes(entPhysicalModelName{device!="",index="1"}[5m])'))
+    'changes(entPhysicalModelName{instance!="",index="1"}[5m])'))
   ts = result['data']['result']
 
   nodes = {x['metric']['instance']: {'model': x['metric']['value']} for x in ts}
